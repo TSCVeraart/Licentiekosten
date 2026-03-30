@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, ChevronDown, ChevronRight } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Ras, type Licentiehouder } from '../lib/supabase'
 
@@ -12,13 +12,21 @@ export default function Licentiekosten() {
   const [rassen, setRassen] = useState<RasDetail[]>([])
   const [tarieven, setTarieven] = useState<Record<string, number | null>>({})
   const [loading, setLoading] = useState(true)
-  const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
+  const [collapsed, setCollapsed] = useState<Set<number>>(() => {
+    try { const s = localStorage.getItem('lk_collapsed'); return s ? new Set(JSON.parse(s)) : new Set() } catch { return new Set() }
+  })
+  const [search, setSearch] = useState('')
   const [bulkVal, setBulkVal] = useState<Record<number, string>>({})
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
 
   const toggleCollapse = (code_groep: number) =>
-    setCollapsed(prev => { const next = new Set(prev); next.has(code_groep) ? next.delete(code_groep) : next.add(code_groep); return next })
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      next.has(code_groep) ? next.delete(code_groep) : next.add(code_groep)
+      localStorage.setItem('lk_collapsed', JSON.stringify([...next]))
+      return next
+    })
 
   const load = async () => {
     const [{ data: ak }, { data: cgc }, { data: r }, { data: rl }, { data: lh }, { data: lk }] = await Promise.all([
@@ -101,6 +109,10 @@ export default function Licentiekosten() {
           <div className="page-title">Licentiekosten</div>
           <div className="page-sub">{codeGroepen.length} artikelcode groepen</div>
         </div>
+        <div className="search-wrap" style={{ width: 260 }}>
+          <Search className="search-icon" />
+          <input placeholder="Zoek op code of omschrijving…" value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
       </div>
 
       {codeGroepen.length === 0 && (
@@ -108,7 +120,11 @@ export default function Licentiekosten() {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {codeGroepen.map(cg => {
+        {codeGroepen.filter(cg =>
+          !search ||
+          cg.code_groep.toString().includes(search) ||
+          cg.omschrijving?.toLowerCase().includes(search.toLowerCase())
+        ).map(cg => {
           const rasId = rasConfigs[cg.code_groep] ?? null
           const ras = rassen.find(r => r.id === rasId) ?? null
           const landen = ras?.landen ?? []

@@ -140,7 +140,7 @@ export default function Rassen() {
       </div>
 
       <div className="card">
-        <div className="table-wrap">
+        <div className="table-wrap" style={{ maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' }}>
           <table>
             <thead><tr>
               <th>Ras</th>
