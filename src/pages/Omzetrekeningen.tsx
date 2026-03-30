@@ -67,6 +67,28 @@ const fmt = (v: number | null) =>
 const fmtTarief = (v: number | null) =>
   v != null ? `€ ${v.toFixed(4)}` : '–'
 
+const COLS: { key: string; label: string; num?: boolean }[] = [
+  { key: 'datum',              label: 'Datum' },
+  { key: 'rekening',          label: 'Rekening' },
+  { key: 'omschrijving',      label: 'Omschrijving' },
+  { key: 'debet_eur',         label: 'Debet EUR',      num: true },
+  { key: 'credit_eur',        label: 'Credit EUR',     num: true },
+  { key: 'vv_bedrag',         label: 'V.V.-bedrag',    num: true },
+  { key: 'debiteur_nr',       label: 'Debiteur' },
+  { key: 'debiteur_naam',     label: 'Naam' },
+  { key: 'land_debiteur',     label: 'Land' },
+  { key: 'soort',             label: 'Soort' },
+  { key: 'artikel',           label: 'Artikel' },
+  { key: 'code_groep',        label: 'Code groep' },
+  { key: 'ras_naam',          label: 'Ras' },
+  { key: 'licentiehouder_naam', label: 'Licentiehouder' },
+  { key: 'licentiekosten',    label: 'Tarief' },
+  { key: 'totaal_licentiekosten', label: 'Totaal LK',  num: true },
+  { key: 'intern_extern',     label: 'Type' },
+  { key: 'aantal',            label: 'Aantal',         num: true },
+]
+const COL_KEYS = COLS.map(c => c.key)
+
 export default function Omzetrekeningen() {
   const [rows, setRows] = useState<Omzetrekening[]>([])
   const [debLandMap, setDebLandMap] = useState<Record<number, string>>({})
@@ -78,6 +100,50 @@ export default function Omzetrekeningen() {
   const [preview, setPreview] = useState<RawRow[] | null>(null)
   const [importing, setImporting] = useState(false)
   const [search, setSearch] = useState('')
+  const [colOrder, setColOrder] = useState<string[]>(
+    () => JSON.parse(localStorage.getItem('omzet-col-order') ?? 'null') ?? COL_KEYS
+  )
+  const [dragKey, setDragKey] = useState<string | null>(null)
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+
+  const orderedCols = colOrder.map(k => COLS.find(c => c.key === k)).filter(Boolean) as typeof COLS
+
+  const onDrop = (targetKey: string) => {
+    if (!dragKey || dragKey === targetKey) { setDragKey(null); setDragOverKey(null); return }
+    const order = [...colOrder]
+    const from = order.indexOf(dragKey)
+    const to = order.indexOf(targetKey)
+    order.splice(from, 1)
+    order.splice(to, 0, dragKey)
+    setColOrder(order)
+    localStorage.setItem('omzet-col-order', JSON.stringify(order))
+    setDragKey(null)
+    setDragOverKey(null)
+  }
+
+  const renderCell = (r: Omzetrekening, key: string) => {
+    switch (key) {
+      case 'datum':              return <td key={key} className="mono" style={{ whiteSpace: 'nowrap' }}>{r.datum ?? '–'}</td>
+      case 'rekening':           return <td key={key} className="mono text-muted" style={{ fontSize: 12 }}>{r.rekening ?? '–'}</td>
+      case 'omschrijving':       return <td key={key} style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.omschrijving ?? '–'}</td>
+      case 'debet_eur':          return <td key={key} className="num">{fmt(r.debet_eur)}</td>
+      case 'credit_eur':         return <td key={key} className="num">{fmt(r.credit_eur)}</td>
+      case 'vv_bedrag':          return <td key={key} className="num">{fmt(r.vv_bedrag)}</td>
+      case 'debiteur_nr':        return <td key={key} className="mono text-muted" style={{ fontSize: 12 }}>{r.debiteur_nr ?? '–'}</td>
+      case 'debiteur_naam':      return <td key={key}>{r.debiteur_naam ?? '–'}</td>
+      case 'land_debiteur':      return <td key={key}>{r.land_debiteur ?? <span className="text-muted">–</span>}</td>
+      case 'soort':              return <td key={key}>{r.soort ? <span className={`badge badge-${r.soort.toLowerCase()}`}>{r.soort}</span> : <span className="text-muted">–</span>}</td>
+      case 'artikel':            return <td key={key} className="mono text-muted" style={{ fontSize: 12 }}>{r.artikel ?? '–'}</td>
+      case 'code_groep':         return <td key={key} className="mono text-muted" style={{ fontSize: 12 }}>{r.code_groep ?? '–'}</td>
+      case 'ras_naam':           return <td key={key}>{r.ras_naam ?? <span className="text-muted">–</span>}</td>
+      case 'licentiehouder_naam':return <td key={key} className="text-muted" style={{ fontSize: 12 }}>{r.licentiehouder_naam ?? '–'}</td>
+      case 'licentiekosten':     return <td key={key} className="mono" style={{ fontSize: 12 }}>{fmtTarief(r.licentiekosten)}</td>
+      case 'totaal_licentiekosten': return <td key={key} className="num" style={{ fontWeight: 500 }}>{fmt(r.totaal_licentiekosten)}</td>
+      case 'intern_extern':      return <td key={key}>{r.intern_extern ?? <span className="text-muted">–</span>}</td>
+      case 'aantal':             return <td key={key} className="num">{r.aantal?.toLocaleString('nl-NL') ?? '–'}</td>
+      default:                   return <td key={key}>–</td>
+    }
+  }
 
   const load = async () => {
     const [{ data }, { data: deb }, { data: art }, { data: cgc }, { data: r }, { data: lh }, { data: lk }] = await Promise.all([
@@ -210,8 +276,6 @@ export default function Omzetrekeningen() {
   const totaalLk = filtered.reduce((s, r) => s + (r.totaal_licentiekosten ?? 0), 0)
 
   const previewHeaders = ['Datum','Rekening','Omschrijving','Debet','Credit','V.V.','Deb. nr','Deb. naam','Land','Soort','Artikel omschr.','Artikel','Code groep','Ras','Licentiehouder','Tarief','Totaal LK','Type','Aantal']
-  const tableHeaders  = ['Datum','Rekening','Omschrijving','Debet EUR','Credit EUR','V.V.-bedrag','Debiteur','Naam','Land','Soort','Artikel','Code groep','Ras','Licentiehouder','Tarief','Totaal LK','Type','Aantal','']
-  const numCols = new Set(['Debet EUR','Credit EUR','V.V.-bedrag','Totaal LK','Aantal'])
 
   return (
     <>
@@ -307,34 +371,35 @@ export default function Omzetrekeningen() {
           <table>
             <thead>
               <tr>
-                {tableHeaders.map(h => (
-                  <th key={h} className={numCols.has(h) ? 'num' : ''} style={{ position: 'sticky', top: 0, zIndex: 1 }}>{h}</th>
+                {orderedCols.map(col => (
+                  <th
+                    key={col.key}
+                    className={col.num ? 'num' : ''}
+                    draggable
+                    onDragStart={() => setDragKey(col.key)}
+                    onDragOver={e => { e.preventDefault(); setDragOverKey(col.key) }}
+                    onDragLeave={() => setDragOverKey(null)}
+                    onDrop={() => onDrop(col.key)}
+                    style={{
+                      position: 'sticky', top: 0, zIndex: 1,
+                      cursor: 'grab',
+                      opacity: dragKey === col.key ? 0.4 : 1,
+                      background: dragOverKey === col.key ? 'var(--accent-bg)' : undefined,
+                      userSelect: 'none',
+                    }}
+                  >
+                    {col.label}
+                  </th>
                 ))}
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}></th>
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={tableHeaders.length} className="empty">Laden…</td></tr>}
-              {!loading && filtered.length === 0 && <tr><td colSpan={tableHeaders.length} className="empty">Geen regels gevonden</td></tr>}
+              {loading && <tr><td colSpan={orderedCols.length + 1} className="empty">Laden…</td></tr>}
+              {!loading && filtered.length === 0 && <tr><td colSpan={orderedCols.length + 1} className="empty">Geen regels gevonden</td></tr>}
               {filtered.map(r => (
                 <tr key={r.id}>
-                  <td className="mono" style={{ whiteSpace: 'nowrap' }}>{r.datum ?? '–'}</td>
-                  <td className="mono text-muted" style={{ fontSize: 12 }}>{r.rekening ?? '–'}</td>
-                  <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.omschrijving ?? '–'}</td>
-                  <td className="num">{fmt(r.debet_eur)}</td>
-                  <td className="num">{fmt(r.credit_eur)}</td>
-                  <td className="num">{fmt(r.vv_bedrag)}</td>
-                  <td className="mono text-muted" style={{ fontSize: 12 }}>{r.debiteur_nr ?? '–'}</td>
-                  <td>{r.debiteur_naam ?? '–'}</td>
-                  <td>{r.land_debiteur ?? <span className="text-muted">–</span>}</td>
-                  <td>{r.soort ? <span className={`badge badge-${r.soort.toLowerCase()}`}>{r.soort}</span> : <span className="text-muted">–</span>}</td>
-                  <td className="mono text-muted" style={{ fontSize: 12 }}>{r.artikel ?? '–'}</td>
-                  <td className="mono text-muted" style={{ fontSize: 12 }}>{r.code_groep ?? '–'}</td>
-                  <td>{r.ras_naam ?? <span className="text-muted">–</span>}</td>
-                  <td className="text-muted" style={{ fontSize: 12 }}>{r.licentiehouder_naam ?? '–'}</td>
-                  <td className="mono" style={{ fontSize: 12 }}>{fmtTarief(r.licentiekosten)}</td>
-                  <td className="num" style={{ fontWeight: 500 }}>{fmt(r.totaal_licentiekosten)}</td>
-                  <td>{r.intern_extern ?? <span className="text-muted">–</span>}</td>
-                  <td className="num">{r.aantal?.toLocaleString('nl-NL') ?? '–'}</td>
+                  {orderedCols.map(col => renderCell(r, col.key))}
                   <td><button className="btn btn-ghost" onClick={() => remove(r.id)}><Trash2 /></button></td>
                 </tr>
               ))}
@@ -342,9 +407,9 @@ export default function Omzetrekeningen() {
             {filtered.length > 0 && (
               <tfoot>
                 <tr>
-                  <td colSpan={15}>Totaal ({filtered.length} regels)</td>
+                  <td colSpan={orderedCols.length - 1}>Totaal ({filtered.length} regels)</td>
                   <td className="num">{fmt(totaalLk)}</td>
-                  <td colSpan={3}></td>
+                  <td></td>
                 </tr>
               </tfoot>
             )}
