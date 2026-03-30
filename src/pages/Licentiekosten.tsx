@@ -109,9 +109,16 @@ export default function Licentiekosten() {
           <div className="page-title">Licentiekosten</div>
           <div className="page-sub">{codeGroepen.length} artikelcode groepen</div>
         </div>
-        <div className="search-wrap" style={{ width: 260 }}>
-          <Search className="search-icon" />
-          <input placeholder="Zoek op code of omschrijving…" value={search} onChange={e => setSearch(e.target.value)} />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="search-wrap" style={{ width: 260 }}>
+            <Search className="search-icon" />
+            <input placeholder="Zoek op code of omschrijving…" value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <button className="btn btn-secondary" onClick={() => {
+            const next = new Set(codeGroepen.map(cg => cg.code_groep))
+            setCollapsed(next)
+            localStorage.setItem('lk_collapsed', JSON.stringify([...next]))
+          }}>Alles dichtklappen</button>
         </div>
       </div>
 
