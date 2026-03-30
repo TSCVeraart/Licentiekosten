@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Upload, Trash2, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type SoortPlant } from '../lib/supabase'
@@ -104,13 +104,23 @@ export default function Omzetrekeningen() {
     () => JSON.parse(localStorage.getItem('omzet-col-order') ?? 'null') ?? COL_KEYS
   )
   const [dragKey, setDragKey] = useState<string | null>(null)
-  const [filterRekening, setFilterRekening] = useState('')
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   const [filterSoort, setFilterSoort] = useState('')
   const [filterLand, setFilterLand] = useState('')
   const [filterRas, setFilterRas] = useState('')
   const [filterLh, setFilterLh] = useState('')
   const [filterType, setFilterType] = useState('')
-  const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+  const [filterDatumVan, setFilterDatumVan] = useState('')
+  const [filterDatumTot, setFilterDatumTot] = useState('')
+  const [sortCol, setSortCol] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const wasDragged = useRef(false)
+
+  const handleSort = (key: string) => {
+    if (wasDragged.current) { wasDragged.current = false; return }
+    if (sortCol === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(key); setSortDir('asc') }
+  }
 
   const orderedCols = colOrder.map(k => COLS.find(c => c.key === k)).filter(Boolean) as typeof COLS
 
@@ -286,13 +296,20 @@ export default function Omzetrekeningen() {
     const q = search.toLowerCase()
     return (
       (!q || (r.debiteur_naam ?? '').toLowerCase().includes(q) || (r.omschrijving ?? '').toLowerCase().includes(q) || (r.rekening ?? '').includes(q) || (r.ras_naam ?? '').toLowerCase().includes(q) || (r.licentiehouder_naam ?? '').toLowerCase().includes(q) || String(r.debiteur_nr ?? '').includes(q)) &&
-      (!filterRekening || r.rekening === filterRekening) &&
       (!filterSoort || r.soort === filterSoort) &&
       (!filterLand || r.land_debiteur === filterLand) &&
       (!filterRas || r.ras_naam === filterRas) &&
       (!filterLh || r.licentiehouder_naam === filterLh) &&
-      (!filterType || r.intern_extern === filterType)
+      (!filterType || r.intern_extern === filterType) &&
+      (!filterDatumVan || (r.datum ?? '') >= filterDatumVan) &&
+      (!filterDatumTot || (r.datum ?? '') <= filterDatumTot)
     )
+  }).sort((a, b) => {
+    if (!sortCol) return 0
+    const numCols = ['debet_eur','credit_eur','vv_bedrag','aantal','licentiekosten','totaal_licentiekosten','debiteur_nr','artikel','code_groep']
+    const av = numCols.includes(sortCol) ? ((a as any)[sortCol] ?? -Infinity) : ((a as any)[sortCol] ?? '').toString().toLowerCase()
+    const bv = numCols.includes(sortCol) ? ((b as any)[sortCol] ?? -Infinity) : ((b as any)[sortCol] ?? '').toString().toLowerCase()
+    return sortDir === 'asc' ? (av > bv ? 1 : av < bv ? -1 : 0) : (av < bv ? 1 : av > bv ? -1 : 0)
   })
 
   const totaalLk = filtered.reduce((s, r) => s + (r.totaal_licentiekosten ?? 0), 0)
@@ -382,14 +399,12 @@ export default function Omzetrekeningen() {
       </div>
 
       <div className="filters">
-        <div className="search-wrap" style={{ flex: 1, maxWidth: 260 }}>
+        <div className="search-wrap" style={{ flex: 1, maxWidth: 240 }}>
           <Search className="search-icon" />
           <input placeholder="Zoek debiteur, ras, licentiehouder…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <select value={filterRekening} onChange={e => setFilterRekening(e.target.value)}>
-          <option value="">Alle rekeningen</option>
-          {[...new Set(rows.map(r => r.rekening).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
-        </select>
+        <input type="date" value={filterDatumVan} onChange={e => setFilterDatumVan(e.target.value)} style={{ width: 'auto' }} title="Datum van" />
+        <input type="date" value={filterDatumTot} onChange={e => setFilterDatumTot(e.target.value)} style={{ width: 'auto' }} title="Datum tot" />
         <select value={filterSoort} onChange={e => setFilterSoort(e.target.value)}>
           <option value="">Alle soorten</option>
           {[...new Set(rows.map(r => r.soort).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
@@ -410,8 +425,8 @@ export default function Omzetrekeningen() {
           <option value="">Alle types</option>
           {[...new Set(rows.map(r => r.intern_extern).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
         </select>
-        {(filterRekening || filterSoort || filterLand || filterRas || filterLh || filterType) && (
-          <button className="btn btn-ghost" onClick={() => { setFilterRekening(''); setFilterSoort(''); setFilterLand(''); setFilterRas(''); setFilterLh(''); setFilterType('') }}>Wis filters</button>
+        {(filterSoort || filterLand || filterRas || filterLh || filterType || filterDatumVan || filterDatumTot) && (
+          <button className="btn btn-ghost" onClick={() => { setFilterSoort(''); setFilterLand(''); setFilterRas(''); setFilterLh(''); setFilterType(''); setFilterDatumVan(''); setFilterDatumTot('') }}>Wis filters</button>
         )}
       </div>
 
@@ -425,19 +440,21 @@ export default function Omzetrekeningen() {
                     key={col.key}
                     className={col.num ? 'num' : ''}
                     draggable
-                    onDragStart={() => setDragKey(col.key)}
+                    onDragStart={() => { wasDragged.current = true; setDragKey(col.key) }}
                     onDragOver={e => { e.preventDefault(); setDragOverKey(col.key) }}
                     onDragLeave={() => setDragOverKey(null)}
                     onDrop={() => onDrop(col.key)}
+                    onClick={() => handleSort(col.key)}
                     style={{
                       position: 'sticky', top: 0, zIndex: 1,
-                      cursor: 'grab',
+                      cursor: 'pointer',
                       opacity: dragKey === col.key ? 0.4 : 1,
                       background: dragOverKey === col.key ? 'var(--accent-bg)' : undefined,
                       userSelect: 'none',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    {col.label}
+                    {col.label} {sortCol === col.key ? (sortDir === 'asc' ? '↑' : '↓') : <span style={{ opacity: 0.3 }}>↕</span>}
                   </th>
                 ))}
                 <th style={{ position: 'sticky', top: 0, zIndex: 1 }}></th>
