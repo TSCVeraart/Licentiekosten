@@ -20,6 +20,9 @@ export default function Licentiekosten() {
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
   const [filterNietIngevuld, setFilterNietIngevuld] = useState(false)
+  const [filterRas, setFilterRas] = useState('')
+  const [filterLh, setFilterLh] = useState('')
+  const [filterSoort, setFilterSoort] = useState('')
 
   const toggleCollapse = (code_groep: number) =>
     setCollapsed(prev => {
@@ -131,11 +134,36 @@ export default function Licentiekosten() {
         <div className="card"><div className="empty">Geen artikelcode groepen gevonden — importeer eerst artikelen.</div></div>
       )}
 
+      <div className="filters">
+        <select value={filterRas} onChange={e => setFilterRas(e.target.value)}>
+          <option value="">Alle rassen</option>
+          {[...new Set(rassen.filter(r => Object.values(rasConfigs).includes(r.id)).map(r => r.naam))].sort().map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <select value={filterLh} onChange={e => setFilterLh(e.target.value)}>
+          <option value="">Alle licentiehouders</option>
+          {[...new Set(rassen.filter(r => Object.values(rasConfigs).includes(r.id)).map(r => r.lh_naam))].sort().map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <select value={filterSoort} onChange={e => setFilterSoort(e.target.value)}>
+          <option value="">Alle soorten</option>
+          <option>Aardbei</option><option>Framboos</option><option>Braam</option>
+        </select>
+        {(filterRas || filterLh || filterSoort) && (
+          <button className="btn btn-ghost" onClick={() => { setFilterRas(''); setFilterLh(''); setFilterSoort('') }}>Wis filters</button>
+        )}
+      </div>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {codeGroepen.filter(cg =>
-          (!search || cg.code_groep.toString().includes(search) || cg.omschrijving?.toLowerCase().includes(search.toLowerCase())) &&
-          (!filterNietIngevuld || !rasConfigs[cg.code_groep])
-        ).map(cg => {
+        {codeGroepen.filter(cg => {
+          const rasId = rasConfigs[cg.code_groep] ?? null
+          const ras = rassen.find(r => r.id === rasId) ?? null
+          return (
+            (!search || cg.code_groep.toString().includes(search) || cg.omschrijving?.toLowerCase().includes(search.toLowerCase())) &&
+            (!filterNietIngevuld || !rasId) &&
+            (!filterRas || ras?.naam === filterRas) &&
+            (!filterLh || ras?.lh_naam === filterLh) &&
+            (!filterSoort || ras?.soort === filterSoort)
+          )
+        }).map(cg => {
           const rasId = rasConfigs[cg.code_groep] ?? null
           const ras = rassen.find(r => r.id === rasId) ?? null
           const landen = ras?.landen ?? []
