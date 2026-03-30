@@ -109,6 +109,8 @@ export default function Rassen() {
 
   const remove = async (id: number, naam: string) => {
     if (!confirm(`Ras "${naam}" verwijderen?`)) return
+    await supabase.from('code_groep_config').delete().eq('ras_id', id)
+    await supabase.from('ras_landen').delete().eq('ras_id', id)
     const { error } = await supabase.from('rassen').delete().eq('id', id)
     if (error) { toast.error(error.message); return }
     toast.success('Verwijderd'); load()
