@@ -3,26 +3,36 @@ import { Plus, Pencil, Trash2, X, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Ras, type Licentiehouder, type SoortPlant } from '../lib/supabase'
 
-const EMPTY_RAS = { licentiehouder_id:0, naam:'', soort:'Aardbei' as SoortPlant, tarief:0, actief:true }
+const LANDEN = ['NL','BE','DE','GB','FR','IT','ES','AT','CH','DK','SE','FI','PL','CZ','GR','IE','LV','BY','AM','AE','MA','US','CA']
+
+const EMPTY_RAS = { licentiehouder_id: 0, naam: '', soort: 'Aardbei' as SoortPlant, actief: true }
 
 export default function Rassen() {
-  const [rassen, setRassen] = useState<(Ras & { licentiehouder_naam?: string })[]>([])
+  const [rassen, setRassen] = useState<(Ras & { licentiehouder_naam?: string; landen?: string[] })[]>([])
   const [lhList, setLhList] = useState<Licentiehouder[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterLh, setFilterLh] = useState('')
   const [filterSoort, setFilterSoort] = useState('')
-  const [modal, setModal] = useState<'add'|'edit'|null>(null)
+  const [modal, setModal] = useState<'add' | 'edit' | null>(null)
   const [form, setForm] = useState(EMPTY_RAS)
-  const [editId, setEditId] = useState<number|null>(null)
+  const [selectedLanden, setSelectedLanden] = useState<string[]>([])
+  const [editId, setEditId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
-    const [{ data:r }, { data:lh }] = await Promise.all([
+    const [{ data: r }, { data: lh }, { data: rl }] = await Promise.all([
       supabase.from('rassen').select('*, licentiehouders(naam)').order('naam'),
       supabase.from('licentiehouders').select('id, naam').order('naam'),
+      supabase.from('ras_landen').select('*'),
     ])
-    setRassen((r ?? []).map((x: any) => ({ ...x, licentiehouder_naam: x.licentiehouders?.naam })))
+    const rasLanden = (rl ?? []) as { ras_id: number; land: string }[]
+    const mapped = (r ?? []).map((x: any) => ({
+      ...x,
+      licentiehouder_naam: x.licentiehouders?.naam,
+      landen: rasLanden.filter(l => l.ras_id === x.id).map(l => l.land),
+    }))
+    setRassen(mapped)
     setLhList((lh ?? []) as Licentiehouder[])
     setLoading(false)
   }
@@ -35,12 +45,46 @@ export default function Rassen() {
       (!filterSoort || r.soort === filterSoort)
   })
 
+  const toggleLand = (land: string) => {
+    setSelectedLanden(prev =>
+      prev.includes(land) ? prev.filter(l => l !== land) : [...prev, land]
+    )
+  }
+
+  const openAdd = () => {
+    setForm({ ...EMPTY_RAS, licentiehouder_id: lhList[0]?.id ?? 0 })
+    setSelectedLanden([])
+    setEditId(null)
+    setModal('add')
+  }
+
+  const openEdit = (r: Ras & { landen?: string[] }) => {
+    setForm({ licentiehouder_id: r.licentiehouder_id, naam: r.naam, soort: r.soort, actief: r.actief })
+    setSelectedLanden(r.landen ?? [])
+    setEditId(r.id)
+    setModal('edit')
+  }
+
   const save = async () => {
     if (!form.naam.trim() || !form.licentiehouder_id) { toast.error('Ras en licentiehouder zijn verplicht'); return }
     setSaving(true)
-    const op = modal === 'add' ? supabase.from('rassen').insert(form) : supabase.from('rassen').update(form).eq('id', editId!)
-    const { error } = await op
-    if (error) { toast.error(error.message); setSaving(false); return }
+
+    let rasId = editId
+    if (modal === 'add') {
+      const { data, error } = await supabase.from('rassen').insert({ ...form, tarief: 0 }).select().single()
+      if (error) { toast.error(error.message); setSaving(false); return }
+      rasId = data.id
+    } else {
+      const { error } = await supabase.from('rassen').update({ ...form }).eq('id', editId!)
+      if (error) { toast.error(error.message); setSaving(false); return }
+    }
+
+    // Sync landen
+    await supabase.from('ras_landen').delete().eq('ras_id', rasId!)
+    if (selectedLanden.length > 0) {
+      await supabase.from('ras_landen').insert(selectedLanden.map(land => ({ ras_id: rasId!, land })))
+    }
+
     toast.success('Opgeslagen'); setSaving(false); setModal(null); load()
   }
 
@@ -58,13 +102,11 @@ export default function Rassen() {
           <div className="page-title">Rassen</div>
           <div className="page-sub">{rassen.length} rassen</div>
         </div>
-        <button className="btn btn-primary" onClick={() => { setForm({ ...EMPTY_RAS, licentiehouder_id:lhList[0]?.id ?? 0 }); setEditId(null); setModal('add') }}>
-          <Plus /> Nieuw ras
-        </button>
+        <button className="btn btn-primary" onClick={openAdd}><Plus /> Nieuw ras</button>
       </div>
 
       <div className="filters">
-        <div className="search-wrap" style={{ flex:1, maxWidth:260 }}>
+        <div className="search-wrap" style={{ flex: 1, maxWidth: 260 }}>
           <Search className="search-icon" />
           <input placeholder="Zoek ras…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
@@ -81,19 +123,34 @@ export default function Rassen() {
       <div className="card">
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Ras</th><th>Licentiehouder</th><th>Soort</th><th className="num">Tarief / plant</th><th>Status</th><th></th></tr></thead>
+            <thead><tr>
+              <th>Ras</th>
+              <th>Licentiehouder</th>
+              <th>Soort</th>
+              <th>Landen</th>
+              <th>Status</th>
+              <th></th>
+            </tr></thead>
             <tbody>
               {loading && <tr><td colSpan={6} className="empty">Laden…</td></tr>}
               {!loading && filtered.length === 0 && <tr><td colSpan={6} className="empty">Geen rassen gevonden</td></tr>}
               {filtered.map(r => (
                 <tr key={r.id}>
-                  <td style={{ fontWeight:500 }}>{r.naam}</td>
+                  <td style={{ fontWeight: 500 }}>{r.naam}</td>
                   <td className="text-muted">{r.licentiehouder_naam}</td>
                   <td><span className={`badge badge-${r.soort.toLowerCase()}`}>{r.soort}</span></td>
-                  <td className="num">{r.tarief > 0 ? `€ ${r.tarief.toFixed(4)}` : <span className="text-muted">–</span>}</td>
+                  <td>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                      {(r.landen ?? []).length === 0
+                        ? <span className="text-muted" style={{ fontSize: 12 }}>–</span>
+                        : (r.landen ?? []).map(l => (
+                          <span key={l} style={{ fontSize: 11, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px' }}>{l}</span>
+                        ))}
+                    </div>
+                  </td>
                   <td>{r.actief ? <span className="badge badge-voorschot">Actief</span> : <span className="badge badge-reservering">Inactief</span>}</td>
                   <td><div className="actions">
-                    <button className="btn btn-ghost" onClick={() => { setForm({ licentiehouder_id:r.licentiehouder_id, naam:r.naam, soort:r.soort, tarief:r.tarief, actief:r.actief }); setEditId(r.id); setModal('edit') }}><Pencil /></button>
+                    <button className="btn btn-ghost" onClick={() => openEdit(r)}><Pencil /></button>
                     <button className="btn btn-ghost" onClick={() => remove(r.id, r.naam)}><Trash2 /></button>
                   </div></td>
                 </tr>
@@ -105,7 +162,7 @@ export default function Rassen() {
 
       {modal && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(null)}>
-          <div className="modal">
+          <div className="modal" style={{ maxWidth: 560 }}>
             <div className="modal-header">
               <span className="modal-title">{modal === 'add' ? 'Nieuw ras' : 'Ras bewerken'}</span>
               <button className="btn btn-ghost" onClick={() => setModal(null)}><X /></button>
@@ -113,33 +170,52 @@ export default function Rassen() {
             <div className="modal-body">
               <div className="form-group">
                 <label>Licentiehouder *</label>
-                <select value={form.licentiehouder_id} onChange={e => setForm(f => ({ ...f, licentiehouder_id:Number(e.target.value) }))}>
+                <select value={form.licentiehouder_id} onChange={e => setForm(f => ({ ...f, licentiehouder_id: Number(e.target.value) }))}>
                   {lhList.map(l => <option key={l.id} value={l.id}>{l.naam}</option>)}
                 </select>
               </div>
               <div className="form-row">
                 <div className="form-group">
                   <label>Rasnaam *</label>
-                  <input value={form.naam} onChange={e => setForm(f => ({ ...f, naam:e.target.value }))} placeholder="bijv. Favori" autoFocus />
+                  <input value={form.naam} onChange={e => setForm(f => ({ ...f, naam: e.target.value }))} placeholder="bijv. Favori" autoFocus />
                 </div>
                 <div className="form-group">
                   <label>Soort *</label>
-                  <select value={form.soort} onChange={e => setForm(f => ({ ...f, soort:e.target.value as SoortPlant }))}>
+                  <select value={form.soort} onChange={e => setForm(f => ({ ...f, soort: e.target.value as SoortPlant }))}>
                     <option>Aardbei</option><option>Framboos</option><option>Braam</option>
                   </select>
                 </div>
               </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Tarief per plant (€)</label>
-                  <input type="number" step="0.0001" min="0" value={form.tarief} onChange={e => setForm(f => ({ ...f, tarief:parseFloat(e.target.value)||0 }))} placeholder="0.0350" />
+              <div className="form-group">
+                <label>Landen</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                  {LANDEN.map(land => (
+                    <div
+                      key={land}
+                      onClick={() => toggleLand(land)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        border: '1px solid',
+                        borderColor: selectedLanden.includes(land) ? 'var(--accent)' : 'var(--border-md)',
+                        background: selectedLanden.includes(land) ? 'var(--accent-bg)' : 'var(--surface)',
+                        color: selectedLanden.includes(land) ? 'var(--accent)' : 'var(--muted)',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {land}
+                    </div>
+                  ))}
                 </div>
-                <div className="form-group">
-                  <label>Status</label>
-                  <select value={form.actief ? 'actief' : 'inactief'} onChange={e => setForm(f => ({ ...f, actief:e.target.value==='actief' }))}>
-                    <option value="actief">Actief</option><option value="inactief">Inactief</option>
-                  </select>
-                </div>
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select value={form.actief ? 'actief' : 'inactief'} onChange={e => setForm(f => ({ ...f, actief: e.target.value === 'actief' }))}>
+                  <option value="actief">Actief</option><option value="inactief">Inactief</option>
+                </select>
               </div>
             </div>
             <div className="modal-footer">
