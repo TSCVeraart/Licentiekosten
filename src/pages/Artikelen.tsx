@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Upload, Trash2, Search } from 'lucide-react'
+import { Upload, Trash2, Search, Plus, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 
@@ -22,6 +22,9 @@ export default function Artikelen() {
   const [search, setSearch] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editVal, setEditVal] = useState('')
+  const [modal, setModal] = useState(false)
+  const [form, setForm] = useState({ artikel: '', omschrijving: '', code_groep: '' })
+  const [saving, setSaving] = useState(false)
 
   const load = async () => {
     const { data } = await supabase
@@ -74,6 +77,22 @@ export default function Artikelen() {
     setRows(prev => prev.map(r => r.id === id ? { ...r, code_groep: val } : r))
   }
 
+  const saveManual = async () => {
+    if (!form.artikel.trim()) { toast.error('Artikelnummer is verplicht'); return }
+    setSaving(true)
+    const { error } = await supabase.from('artikel_codes').upsert({
+      artikel: parseInt(form.artikel) || null,
+      omschrijving: form.omschrijving.trim() || null,
+      code_groep: form.code_groep.trim() ? parseInt(form.code_groep) || null : null,
+    }, { onConflict: 'artikel' })
+    if (error) { toast.error(error.message); setSaving(false); return }
+    toast.success('Opgeslagen')
+    setSaving(false)
+    setModal(false)
+    setForm({ artikel: '', omschrijving: '', code_groep: '' })
+    load()
+  }
+
   const removeAll = async () => {
     if (!confirm(`Alle ${rows.length} artikelen verwijderen?`)) return
     const { error } = await supabase.from('artikel_codes').delete().gte('id', 0)
@@ -96,11 +115,16 @@ export default function Artikelen() {
           <div className="page-title">Artikelen</div>
           <div className="page-sub">{rows.length} artikelen</div>
         </div>
-        {rows.length > 0 && (
-          <button className="btn btn-ghost" style={{ color: 'var(--danger)' }} onClick={removeAll}>
-            <Trash2 size={15} /> Alles verwijderen
+        <div style={{ display: 'flex', gap: 8 }}>
+          {rows.length > 0 && (
+            <button className="btn btn-ghost" style={{ color: 'var(--danger)' }} onClick={removeAll}>
+              <Trash2 size={15} /> Alles verwijderen
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={() => { setForm({ artikel: '', omschrijving: '', code_groep: '' }); setModal(true) }}>
+            <Plus /> Artikel toevoegen
           </button>
-        )}
+        </div>
       </div>
 
       {/* Import */}
@@ -206,6 +230,37 @@ export default function Artikelen() {
           </table>
         </div>
       </div>
+
+      {modal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">Artikel toevoegen</span>
+              <button className="btn btn-ghost" onClick={() => setModal(false)}><X /></button>
+            </div>
+            <div className="modal-body">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Artikelnummer *</label>
+                  <input type="number" value={form.artikel} onChange={e => setForm(f => ({ ...f, artikel: e.target.value }))} placeholder="bijv. 12345" autoFocus />
+                </div>
+                <div className="form-group">
+                  <label>Code groep</label>
+                  <input type="number" value={form.code_groep} onChange={e => setForm(f => ({ ...f, code_groep: e.target.value }))} placeholder="bijv. 101" />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Omschrijving</label>
+                <input value={form.omschrijving} onChange={e => setForm(f => ({ ...f, omschrijving: e.target.value }))} placeholder="bijv. Aardbeien NL" />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setModal(false)}>Annuleren</button>
+              <button className="btn btn-primary" onClick={saveManual} disabled={saving}>{saving ? 'Opslaan…' : 'Opslaan'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
