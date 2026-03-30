@@ -27,8 +27,17 @@ export default function Debiteuren() {
   }
 
   const load = async () => {
-    const { data } = await supabase.from('debiteuren').select('*').order('naam')
-    setRows(data ?? []); setLoading(false)
+    const pageSize = 1000
+    let all: Debiteur[] = []
+    let from = 0
+    while (true) {
+      const { data } = await supabase.from('debiteuren').select('*').order('naam').range(from, from + pageSize - 1)
+      if (!data?.length) break
+      all = [...all, ...data as Debiteur[]]
+      if (data.length < pageSize) break
+      from += pageSize
+    }
+    setRows(all); setLoading(false)
   }
   useEffect(() => { load() }, [])
 
@@ -101,9 +110,21 @@ export default function Debiteuren() {
           <div className="page-title">Debiteuren</div>
           <div className="page-sub">{rows.length} debiteuren</div>
         </div>
-        <button className="btn btn-primary" onClick={() => { setForm(EMPTY); setEditId(null); setModal('add') }}>
-          <Plus /> Nieuwe debiteur
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {rows.length > 0 && (
+            <button className="btn btn-ghost" style={{ color: 'var(--danger)' }} onClick={async () => {
+              if (!confirm(`Alle ${rows.length} debiteuren verwijderen?`)) return
+              const { error } = await supabase.from('debiteuren').delete().gte('id', 0)
+              if (error) { toast.error(error.message); return }
+              toast.success('Alle debiteuren verwijderd'); load()
+            }}>
+              <Trash2 size={15} /> Alles verwijderen
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={() => { setForm(EMPTY); setEditId(null); setModal('add') }}>
+            <Plus /> Nieuwe debiteur
+          </button>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16, padding: 16 }}>
