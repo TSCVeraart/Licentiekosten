@@ -193,10 +193,10 @@ export default function Artikelen() {
           <table>
             <thead>
               <tr>
-                <th style={{ position: 'sticky', top: 0 }}>Artikel</th>
-                <th style={{ position: 'sticky', top: 0 }}>Omschrijving</th>
-                <th style={{ position: 'sticky', top: 0 }}>Code groep</th>
-                <th style={{ position: 'sticky', top: 0 }}></th>
+                <th>Artikel</th>
+                <th>Omschrijving</th>
+                <th>Code groep</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
