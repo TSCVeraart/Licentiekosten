@@ -19,6 +19,7 @@ export default function Licentiekosten() {
   const [bulkVal, setBulkVal] = useState<Record<number, string>>({})
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
+  const [filterNietIngevuld, setFilterNietIngevuld] = useState(false)
 
   const toggleCollapse = (code_groep: number) =>
     setCollapsed(prev => {
@@ -114,6 +115,10 @@ export default function Licentiekosten() {
             <Search className="search-icon" />
             <input placeholder="Zoek op code of omschrijving…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
+          <button
+            className={`btn ${filterNietIngevuld ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setFilterNietIngevuld(f => !f)}
+          >Niet ingevuld</button>
           <button className="btn btn-secondary" onClick={() => {
             const next = new Set(codeGroepen.map(cg => cg.code_groep))
             setCollapsed(next)
@@ -128,9 +133,8 @@ export default function Licentiekosten() {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {codeGroepen.filter(cg =>
-          !search ||
-          cg.code_groep.toString().includes(search) ||
-          cg.omschrijving?.toLowerCase().includes(search.toLowerCase())
+          (!search || cg.code_groep.toString().includes(search) || cg.omschrijving?.toLowerCase().includes(search.toLowerCase())) &&
+          (!filterNietIngevuld || !rasConfigs[cg.code_groep])
         ).map(cg => {
           const rasId = rasConfigs[cg.code_groep] ?? null
           const ras = rassen.find(r => r.id === rasId) ?? null
