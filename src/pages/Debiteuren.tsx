@@ -60,7 +60,8 @@ export default function Debiteuren() {
       }
     }).filter(r => r.nummer && r.naam)
     if (!parsed.length) { toast.error('Geen geldige rijen gevonden'); return }
-    setImportRows(parsed)
+    const deduped = [...new Map(parsed.map(r => [r.nummer, r])).values()]
+    setImportRows(deduped)
     setModal('import')
     toast.success(`${parsed.length} regels herkend`)
   }
