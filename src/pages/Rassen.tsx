@@ -3,7 +3,7 @@ import { Plus, Pencil, Trash2, X, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Ras, type Licentiehouder, type SoortPlant } from '../lib/supabase'
 
-const LANDEN = ['NL','BE','DE','GB','FR','IT','ES','AT','CH','DK','SE','FI','PL','CZ','GR','IE','LV','BY','AM','AE','MA','US','CA']
+const LANDEN = ['NL','BE','LU','DE','GB','IE','FR','PL','AT','CH','IT','DK','SE','FI','NO','EE','LV','LT','ES','PT','MT','RO','AR','MA','TN','BY','AM','GR','HU','SK','DZ','HR','BG','SI','RU','AE']
 
 const EMPTY_RAS = { licentiehouder_id: 0, naam: '', soort: 'Aardbei' as SoortPlant, actief: true }
 
@@ -17,6 +17,8 @@ export default function Rassen() {
   const [modal, setModal] = useState<'add' | 'edit' | null>(null)
   const [form, setForm] = useState(EMPTY_RAS)
   const [selectedLanden, setSelectedLanden] = useState<string[]>([])
+  const [extraLanden, setExtraLanden] = useState<string[]>([])
+  const [nieuwLand, setNieuwLand] = useState('')
   const [editId, setEditId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -54,15 +56,30 @@ export default function Rassen() {
   const openAdd = () => {
     setForm({ ...EMPTY_RAS, licentiehouder_id: lhList[0]?.id ?? 0 })
     setSelectedLanden([])
+    setExtraLanden([])
+    setNieuwLand('')
     setEditId(null)
     setModal('add')
   }
 
   const openEdit = (r: Ras & { landen?: string[] }) => {
     setForm({ licentiehouder_id: r.licentiehouder_id, naam: r.naam, soort: r.soort, actief: r.actief })
-    setSelectedLanden(r.landen ?? [])
+    const bestaand = r.landen ?? []
+    setSelectedLanden(bestaand)
+    setExtraLanden(bestaand.filter(l => !LANDEN.includes(l)))
+    setNieuwLand('')
     setEditId(r.id)
     setModal('edit')
+  }
+
+  const alleLanden = [...LANDEN, ...extraLanden]
+
+  const addNieuwLand = () => {
+    const code = nieuwLand.trim().toUpperCase()
+    if (!code || alleLanden.includes(code)) { setNieuwLand(''); return }
+    setExtraLanden(prev => [...prev, code])
+    setSelectedLanden(prev => [...prev, code])
+    setNieuwLand('')
   }
 
   const save = async () => {
@@ -193,13 +210,13 @@ export default function Rassen() {
                     type="button"
                     className="btn btn-ghost"
                     style={{ fontSize: 12, padding: '2px 8px' }}
-                    onClick={() => setSelectedLanden(selectedLanden.length === LANDEN.length ? [] : [...LANDEN])}
+                    onClick={() => setSelectedLanden(selectedLanden.length === alleLanden.length ? [] : [...alleLanden])}
                   >
-                    {selectedLanden.length === LANDEN.length ? 'Niets selecteren' : 'Alles selecteren'}
+                    {selectedLanden.length === alleLanden.length ? 'Niets selecteren' : 'Alles selecteren'}
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                  {LANDEN.map(land => (
+                  {alleLanden.map(land => (
                     <div
                       key={land}
                       onClick={() => toggleLand(land)}
@@ -219,6 +236,16 @@ export default function Rassen() {
                       {land}
                     </div>
                   ))}
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <input
+                      value={nieuwLand}
+                      onChange={e => setNieuwLand(e.target.value.toUpperCase())}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addNieuwLand() } }}
+                      placeholder="+ land"
+                      maxLength={3}
+                      style={{ width: 60, padding: '4px 8px', fontSize: 12, borderRadius: 6 }}
+                    />
+                  </div>
                 </div>
               </div>
               <div className="form-group">
