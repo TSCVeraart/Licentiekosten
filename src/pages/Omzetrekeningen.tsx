@@ -116,6 +116,13 @@ export default function Omzetrekeningen() {
     toast.success('Verwijderd'); load()
   }
 
+  const removeAll = async () => {
+    if (!confirm(`Alle ${rows.length} regels verwijderen? Dit kan niet ongedaan worden gemaakt.`)) return
+    const { error } = await supabase.from('omzetrekeningen').delete().gte('id', 0)
+    if (error) { toast.error(error.message); return }
+    toast.success('Alle data verwijderd'); load()
+  }
+
   const filtered = rows.filter(r => {
     const q = search.toLowerCase()
     return !q ||
@@ -132,6 +139,11 @@ export default function Omzetrekeningen() {
           <div className="page-title">Omzetrekeningen</div>
           <div className="page-sub">{rows.length} regels</div>
         </div>
+        {rows.length > 0 && (
+          <button className="btn btn-ghost" style={{ color: 'var(--danger, #e53e3e)' }} onClick={removeAll}>
+            <Trash2 size={15} /> Alles verwijderen
+          </button>
+        )}
       </div>
 
       {/* Import */}
