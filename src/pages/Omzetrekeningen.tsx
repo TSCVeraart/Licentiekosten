@@ -23,6 +23,7 @@ interface Omzetrekening {
   licentiehouder_naam: string | null
   licentiekosten: number | null
   totaal_licentiekosten: number | null
+  intern_extern: string | null
   created_at: string
 }
 
@@ -32,6 +33,13 @@ const REKENING_SOORT: Record<string, SoortPlant> = {
   '8301': 'Aardbei',
   '8304': 'Framboos',
   '8305': 'Braam',
+}
+
+const internExtern = (debiteur_nr: number | null, lh_naam: string | null): string => {
+  if (debiteur_nr === 1870) return 'Intern'
+  if (debiteur_nr === 2413 && (lh_naam ?? '').toLowerCase().includes('royakkers')) return 'Royakkers'
+  if (debiteur_nr === 2435 && (lh_naam ?? '').toLowerCase().includes('berryworld')) return 'BerryWorld'
+  return 'Extern'
 }
 
 const soortVanRekening = (rekening: string | null): SoortPlant | null => {
@@ -159,6 +167,7 @@ export default function Omzetrekeningen() {
         licentiehouder_naam: rasInfo?.lh_naam ?? null,
         licentiekosten,
         totaal_licentiekosten,
+        intern_extern: internExtern(debiteur_nr, rasInfo?.lh_naam ?? null),
       }
     })
     setPreview(parsed)
@@ -200,8 +209,8 @@ export default function Omzetrekeningen() {
 
   const totaalLk = filtered.reduce((s, r) => s + (r.totaal_licentiekosten ?? 0), 0)
 
-  const previewHeaders = ['Datum','Rekening','Omschrijving','Debet','Credit','V.V.','Deb. nr','Deb. naam','Land','Soort','Artikel omschr.','Artikel','Code groep','Ras','Licentiehouder','Tarief','Totaal LK','Aantal']
-  const tableHeaders  = ['Datum','Rekening','Omschrijving','Debet EUR','Credit EUR','V.V.-bedrag','Debiteur','Naam','Land','Soort','Artikel','Code groep','Ras','Licentiehouder','Tarief','Totaal LK','Aantal','']
+  const previewHeaders = ['Datum','Rekening','Omschrijving','Debet','Credit','V.V.','Deb. nr','Deb. naam','Land','Soort','Artikel omschr.','Artikel','Code groep','Ras','Licentiehouder','Tarief','Totaal LK','Type','Aantal']
+  const tableHeaders  = ['Datum','Rekening','Omschrijving','Debet EUR','Credit EUR','V.V.-bedrag','Debiteur','Naam','Land','Soort','Artikel','Code groep','Ras','Licentiehouder','Tarief','Totaal LK','Type','Aantal','']
   const numCols = new Set(['Debet EUR','Credit EUR','V.V.-bedrag','Totaal LK','Aantal'])
 
   return (
@@ -276,6 +285,7 @@ export default function Omzetrekeningen() {
                     <td style={{ padding: '4px 8px' }}>{r.licentiehouder_naam ?? <span style={{ color: 'var(--muted)' }}>–</span>}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: "'DM Mono',monospace" }}>{fmtTarief(r.licentiekosten)}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: "'DM Mono',monospace", fontWeight: 500 }}>{fmt(r.totaal_licentiekosten)}</td>
+                    <td style={{ padding: '4px 8px' }}>{r.intern_extern ?? '–'}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right' }}>{r.aantal ?? '–'}</td>
                   </tr>
                 ))}
@@ -323,6 +333,7 @@ export default function Omzetrekeningen() {
                   <td className="text-muted" style={{ fontSize: 12 }}>{r.licentiehouder_naam ?? '–'}</td>
                   <td className="mono" style={{ fontSize: 12 }}>{fmtTarief(r.licentiekosten)}</td>
                   <td className="num" style={{ fontWeight: 500 }}>{fmt(r.totaal_licentiekosten)}</td>
+                  <td>{r.intern_extern ?? <span className="text-muted">–</span>}</td>
                   <td className="num">{r.aantal?.toLocaleString('nl-NL') ?? '–'}</td>
                   <td><button className="btn btn-ghost" onClick={() => remove(r.id)}><Trash2 /></button></td>
                 </tr>
@@ -333,7 +344,7 @@ export default function Omzetrekeningen() {
                 <tr>
                   <td colSpan={15}>Totaal ({filtered.length} regels)</td>
                   <td className="num">{fmt(totaalLk)}</td>
-                  <td colSpan={2}></td>
+                  <td colSpan={3}></td>
                 </tr>
               </tfoot>
             )}
