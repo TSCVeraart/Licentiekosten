@@ -177,20 +177,6 @@ export default function Licentiehouders() {
                 <label>Rasnaam *</label>
                 <input value={rasForm.naam} onChange={e => setRasForm(f => ({ ...f, naam: e.target.value }))} placeholder="bijv. Favori" autoFocus />
               </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Soort *</label>
-                  <select value={rasForm.soort} onChange={e => setRasForm(f => ({ ...f, soort: e.target.value as SoortPlant }))}>
-                    <option>Aardbei</option><option>Framboos</option><option>Braam</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Tarief per plant (€)</label>
-                  <input type="number" step="0.0001" min="0" value={rasForm.tarief}
-                    onChange={e => setRasForm(f => ({ ...f, tarief: parseFloat(e.target.value) || 0 }))}
-                    placeholder="0.0350" />
-                </div>
-              </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setModal(null)}>Annuleren</button>
