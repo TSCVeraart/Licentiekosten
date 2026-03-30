@@ -99,9 +99,9 @@ export default function Rassen() {
     // Sync landen
     const { error: deleteError } = await supabase.from('ras_landen').delete().eq('ras_id', rasId!)
     if (deleteError) { toast.error('Fout bij opslaan landen: ' + deleteError.message); setSaving(false); return }
-    if (selectedLanden.length > 0) {
-      const { error: insertError } = await supabase.from('ras_landen').insert(selectedLanden.map(land => ({ ras_id: rasId!, land })))
-      if (insertError) { toast.error('Fout bij opslaan landen: ' + insertError.message); setSaving(false); return }
+    for (const land of selectedLanden) {
+      const { error: insertError } = await supabase.from('ras_landen').insert({ ras_id: rasId!, land })
+      if (insertError) { toast.error(`Fout bij opslaan land ${land}: ` + insertError.message); setSaving(false); return }
     }
 
     toast.success('Opgeslagen'); setSaving(false); setModal(null); load()
