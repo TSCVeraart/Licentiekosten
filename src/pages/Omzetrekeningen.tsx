@@ -104,6 +104,12 @@ export default function Omzetrekeningen() {
     () => JSON.parse(localStorage.getItem('omzet-col-order') ?? 'null') ?? COL_KEYS
   )
   const [dragKey, setDragKey] = useState<string | null>(null)
+  const [filterRekening, setFilterRekening] = useState('')
+  const [filterSoort, setFilterSoort] = useState('')
+  const [filterLand, setFilterLand] = useState('')
+  const [filterRas, setFilterRas] = useState('')
+  const [filterLh, setFilterLh] = useState('')
+  const [filterType, setFilterType] = useState('')
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
 
   const orderedCols = colOrder.map(k => COLS.find(c => c.key === k)).filter(Boolean) as typeof COLS
@@ -145,9 +151,23 @@ export default function Omzetrekeningen() {
     }
   }
 
+  const fetchAllOmzet = async (): Promise<Omzetrekening[]> => {
+    const pageSize = 1000
+    let all: Omzetrekening[] = []
+    let from = 0
+    while (true) {
+      const { data } = await supabase.from('omzetrekeningen').select('*').order('datum', { ascending: false }).range(from, from + pageSize - 1)
+      if (!data?.length) break
+      all = [...all, ...data as Omzetrekening[]]
+      if (data.length < pageSize) break
+      from += pageSize
+    }
+    return all
+  }
+
   const load = async () => {
-    const [{ data }, { data: deb }, { data: art }, { data: cgc }, { data: r }, { data: lh }, { data: lk }] = await Promise.all([
-      supabase.from('omzetrekeningen').select('*').order('datum', { ascending: false }).limit(2000),
+    const [omzetData, { data: deb }, { data: art }, { data: cgc }, { data: r }, { data: lh }, { data: lk }] = await Promise.all([
+      fetchAllOmzet(),
       supabase.from('debiteuren').select('nummer, land'),
       supabase.from('artikel_codes').select('artikel, code_groep'),
       supabase.from('code_groep_config').select('code_groep, ras_id'),
@@ -155,7 +175,7 @@ export default function Omzetrekeningen() {
       supabase.from('licentiehouders').select('id, naam'),
       supabase.from('licentiekosten').select('code_groep, land, tarief'),
     ])
-    setRows((data ?? []) as Omzetrekening[])
+    setRows(omzetData)
 
     // Debiteur → land
     const debMap: Record<number, string> = {}
@@ -264,13 +284,15 @@ export default function Omzetrekeningen() {
 
   const filtered = rows.filter(r => {
     const q = search.toLowerCase()
-    return !q ||
-      (r.debiteur_naam ?? '').toLowerCase().includes(q) ||
-      (r.omschrijving ?? '').toLowerCase().includes(q) ||
-      (r.rekening ?? '').includes(q) ||
-      (r.ras_naam ?? '').toLowerCase().includes(q) ||
-      (r.licentiehouder_naam ?? '').toLowerCase().includes(q) ||
-      String(r.debiteur_nr ?? '').includes(q)
+    return (
+      (!q || (r.debiteur_naam ?? '').toLowerCase().includes(q) || (r.omschrijving ?? '').toLowerCase().includes(q) || (r.rekening ?? '').includes(q) || (r.ras_naam ?? '').toLowerCase().includes(q) || (r.licentiehouder_naam ?? '').toLowerCase().includes(q) || String(r.debiteur_nr ?? '').includes(q)) &&
+      (!filterRekening || r.rekening === filterRekening) &&
+      (!filterSoort || r.soort === filterSoort) &&
+      (!filterLand || r.land_debiteur === filterLand) &&
+      (!filterRas || r.ras_naam === filterRas) &&
+      (!filterLh || r.licentiehouder_naam === filterLh) &&
+      (!filterType || r.intern_extern === filterType)
+    )
   })
 
   const totaalLk = filtered.reduce((s, r) => s + (r.totaal_licentiekosten ?? 0), 0)
@@ -360,10 +382,37 @@ export default function Omzetrekeningen() {
       </div>
 
       <div className="filters">
-        <div className="search-wrap" style={{ flex: 1, maxWidth: 300 }}>
+        <div className="search-wrap" style={{ flex: 1, maxWidth: 260 }}>
           <Search className="search-icon" />
           <input placeholder="Zoek debiteur, ras, licentiehouder…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
+        <select value={filterRekening} onChange={e => setFilterRekening(e.target.value)}>
+          <option value="">Alle rekeningen</option>
+          {[...new Set(rows.map(r => r.rekening).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
+        </select>
+        <select value={filterSoort} onChange={e => setFilterSoort(e.target.value)}>
+          <option value="">Alle soorten</option>
+          {[...new Set(rows.map(r => r.soort).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
+        </select>
+        <select value={filterLand} onChange={e => setFilterLand(e.target.value)}>
+          <option value="">Alle landen</option>
+          {[...new Set(rows.map(r => r.land_debiteur).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
+        </select>
+        <select value={filterRas} onChange={e => setFilterRas(e.target.value)}>
+          <option value="">Alle rassen</option>
+          {[...new Set(rows.map(r => r.ras_naam).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
+        </select>
+        <select value={filterLh} onChange={e => setFilterLh(e.target.value)}>
+          <option value="">Alle licentiehouders</option>
+          {[...new Set(rows.map(r => r.licentiehouder_naam).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
+        </select>
+        <select value={filterType} onChange={e => setFilterType(e.target.value)}>
+          <option value="">Alle types</option>
+          {[...new Set(rows.map(r => r.intern_extern).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
+        </select>
+        {(filterRekening || filterSoort || filterLand || filterRas || filterLh || filterType) && (
+          <button className="btn btn-ghost" onClick={() => { setFilterRekening(''); setFilterSoort(''); setFilterLand(''); setFilterRas(''); setFilterLh(''); setFilterType('') }}>Wis filters</button>
+        )}
       </div>
 
       <div className="card">
