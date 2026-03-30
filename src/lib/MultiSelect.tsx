@@ -9,6 +9,7 @@ interface Props {
 
 export function MultiSelect({ label, options, selected, onChange }: Props) {
   const [open, setOpen] = useState(false)
+  const [flipLeft, setFlipLeft] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -18,6 +19,12 @@ export function MultiSelect({ label, options, selected, onChange }: Props) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  useEffect(() => {
+    if (!open || !ref.current) return
+    const rect = ref.current.getBoundingClientRect()
+    setFlipLeft(rect.left + 200 > window.innerWidth - 16)
+  }, [open])
 
   const toggle = (v: string) =>
     onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v])
@@ -48,7 +55,10 @@ export function MultiSelect({ label, options, selected, onChange }: Props) {
       </button>
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200,
+          position: 'absolute', top: 'calc(100% + 4px)',
+          left: flipLeft ? 'auto' : 0,
+          right: flipLeft ? 0 : 'auto',
+          zIndex: 200,
           background: 'var(--surface)', border: '1px solid var(--border-md)',
           borderRadius: 'var(--radius)', boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
           minWidth: 200, maxHeight: 300, overflowY: 'auto',
