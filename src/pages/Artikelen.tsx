@@ -41,7 +41,7 @@ export default function Artikelen() {
       return {
         artikel: c[0]?.trim() ? parseInt(c[0]) || null : null,
         omschrijving: c[1]?.trim() || null,
-        code_groep: null,
+        code_groep: c[2]?.trim() ? parseInt(c[2]) || null : null,
       }
     })
     setPreview(parsed)
@@ -107,7 +107,7 @@ export default function Artikelen() {
       <div className="card" style={{ marginBottom: 16, padding: 16 }}>
         <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 6 }}>Excel data plakken</div>
         <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
-          Kolommen A→B: Artikel (code) · Omschrijving
+          Kolommen A→C: Artikel (code) · Omschrijving · Code groep
         </div>
         <textarea
           value={paste}
@@ -138,7 +138,7 @@ export default function Artikelen() {
             <table style={{ fontSize: 12, width: '100%' }}>
               <thead>
                 <tr>
-                  {['Artikel', 'Omschrijving'].map(h => (
+                  {['Artikel', 'Omschrijving', 'Code groep'].map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: '4px 8px', fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--card, var(--surface))', zIndex: 1 }}>{h}</th>
                   ))}
                 </tr>
@@ -148,6 +148,7 @@ export default function Artikelen() {
                   <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
                     <td style={{ padding: '4px 8px', fontFamily: "'DM Mono', monospace" }}>{r.artikel ?? '–'}</td>
                     <td style={{ padding: '4px 8px' }}>{r.omschrijving ?? '–'}</td>
+                    <td style={{ padding: '4px 8px', fontFamily: "'DM Mono', monospace" }}>{r.code_groep ?? '–'}</td>
                   </tr>
                 ))}
               </tbody>
