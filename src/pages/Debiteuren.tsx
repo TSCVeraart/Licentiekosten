@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, Search, Pencil, Trash2, X, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Debiteur, type DebiteurType } from '../lib/supabase'
@@ -17,7 +17,7 @@ export default function Debiteuren() {
   const [saving, setSaving] = useState(false)
   const [importRows, setImportRows] = useState<{nummer:string,naam:string,land:string}[]>([])
   const [importing, setImporting] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [paste, setPaste] = useState('')
 
   const load = async () => {
     const { data } = await supabase.from('debiteuren').select('*').order('naam')
@@ -48,26 +48,21 @@ export default function Debiteuren() {
     toast.success('Verwijderd'); load()
   }
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      const text = evt.target?.result as string
-      const lines = text.split('\n').filter(l => l.trim())
-      const parsed = lines.slice(1).map(line => {
-        const cols = line.split(/[,;	]/)
-        return {
-          nummer: (cols[0] ?? '').trim().replace(/"/g,''),
-          naam:   (cols[1] ?? '').trim().replace(/"/g,''),
-          land:   (cols[2] ?? '').trim().replace(/"/g,'').toUpperCase().slice(0,2),
-        }
-      }).filter(r => r.nummer && r.naam)
-      setImportRows(parsed)
-      setModal('import')
-    }
-    reader.readAsText(file)
-    e.target.value = ''
+  const parsePaste = () => {
+    const lines = paste.trim().split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim())
+    if (!lines.length) { toast.error('Geen data geplakt'); return }
+    const parsed = lines.map(line => {
+      const c = line.split('\t')
+      return {
+        nummer: (c[0] ?? '').trim(),
+        naam:   (c[1] ?? '').trim(),
+        land:   (c[2] ?? '').trim().toUpperCase().slice(0, 2) || 'NL',
+      }
+    }).filter(r => r.nummer && r.naam)
+    if (!parsed.length) { toast.error('Geen geldige rijen gevonden'); return }
+    setImportRows(parsed)
+    setModal('import')
+    toast.success(`${parsed.length} regels herkend`)
   }
 
   const doImport = async () => {
@@ -80,27 +75,44 @@ export default function Debiteuren() {
     const { error } = await supabase.from('debiteuren').upsert(payload, { onConflict: 'nummer' })
     if (error) { toast.error(error.message); setImporting(false); return }
     toast.success(`${importRows.length} debiteuren geïmporteerd`)
-    setImporting(false); setModal(null); setImportRows([]); load()
+    setImporting(false); setModal(null); setImportRows([]); setPaste(''); load()
   }
 
   const lands = [...new Set(rows.map(r => r.land))].sort()
 
   return (
     <>
-      <input ref={fileRef} type="file" accept=".csv,.txt,.xlsx" style={{ display:'none' }} onChange={handleFile} />
-
       <div className="page-header">
         <div>
           <div className="page-title">Debiteuren</div>
           <div className="page-sub">{rows.length} debiteuren</div>
         </div>
-        <div style={{ display:'flex', gap:8 }}>
-          <button className="btn btn-secondary" onClick={() => fileRef.current?.click()}>
-            <Upload /> Excel importeren
-          </button>
-          <button className="btn btn-primary" onClick={() => { setForm(EMPTY); setEditId(null); setModal('add') }}>
-            <Plus /> Nieuwe debiteur
-          </button>
+        <button className="btn btn-primary" onClick={() => { setForm(EMPTY); setEditId(null); setModal('add') }}>
+          <Plus /> Nieuwe debiteur
+        </button>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16, padding: 16 }}>
+        <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 6 }}>Excel data plakken</div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+          Kolommen A→C: Debnr · Naam · Land (bijv. NL)
+        </div>
+        <textarea
+          value={paste}
+          onChange={e => { setPaste(e.target.value); setImportRows([]) }}
+          placeholder="Kopieer vanuit Excel en plak hier (Ctrl+V)…"
+          style={{ width: '100%', minHeight: 90, fontFamily: "'DM Mono', monospace", fontSize: 12, padding: '10px 12px', border: '1px solid var(--border-md)', borderRadius: 'var(--radius)', background: 'var(--surface)', color: 'var(--text)', resize: 'vertical', boxSizing: 'border-box' }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+          <button className="btn btn-secondary" onClick={parsePaste} disabled={!paste.trim()}>Verwerk</button>
+          {importRows.length > 0 && (
+            <>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{importRows.length} regels klaar</span>
+              <button className="btn btn-primary" onClick={doImport} disabled={importing} style={{ marginLeft: 'auto' }}>
+                <Upload size={14} /> {importing ? 'Importeren…' : `${importRows.length} regels importeren`}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
