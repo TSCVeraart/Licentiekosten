@@ -19,6 +19,10 @@ interface Omzetrekening {
   aantal: number | null
   soort: SoortPlant | null
   code_groep: number | null
+  ras_naam: string | null
+  licentiehouder_naam: string | null
+  licentiekosten: number | null
+  totaal_licentiekosten: number | null
   created_at: string
 }
 
@@ -52,10 +56,15 @@ const parseDate = (s: string) => {
 const fmt = (v: number | null) =>
   v != null ? '€\u00a0' + v.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '–'
 
+const fmtTarief = (v: number | null) =>
+  v != null ? `€ ${v.toFixed(4)}` : '–'
+
 export default function Omzetrekeningen() {
   const [rows, setRows] = useState<Omzetrekening[]>([])
   const [debLandMap, setDebLandMap] = useState<Record<number, string>>({})
   const [artikelGroepMap, setArtikelGroepMap] = useState<Record<number, number>>({})
+  const [codeGroepRasMap, setCodeGroepRasMap] = useState<Record<number, { naam: string; lh_naam: string }>>({})
+  const [tarievenMap, setTarievenMap] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [paste, setPaste] = useState('')
   const [preview, setPreview] = useState<RawRow[] | null>(null)
@@ -63,23 +72,52 @@ export default function Omzetrekeningen() {
   const [search, setSearch] = useState('')
 
   const load = async () => {
-    const [{ data }, { data: deb }, { data: art }] = await Promise.all([
+    const [{ data }, { data: deb }, { data: art }, { data: cgc }, { data: r }, { data: lh }, { data: lk }] = await Promise.all([
       supabase.from('omzetrekeningen').select('*').order('datum', { ascending: false }).limit(2000),
       supabase.from('debiteuren').select('nummer, land'),
       supabase.from('artikel_codes').select('artikel, code_groep'),
+      supabase.from('code_groep_config').select('code_groep, ras_id'),
+      supabase.from('rassen').select('id, naam, licentiehouder_id'),
+      supabase.from('licentiehouders').select('id, naam'),
+      supabase.from('licentiekosten').select('code_groep, land, tarief'),
     ])
     setRows((data ?? []) as Omzetrekening[])
+
+    // Debiteur → land
     const debMap: Record<number, string> = {}
     for (const d of (deb ?? []) as { nummer: string; land: string }[]) {
       const nr = parseInt(d.nummer)
       if (!isNaN(nr)) debMap[nr] = d.land
     }
     setDebLandMap(debMap)
+
+    // Artikel → code_groep
     const artMap: Record<number, number> = {}
-    for (const a of (art ?? []) as { artikel: number; code_groep: number | null }[]) {
+    for (const a of (art ?? []) as { artikel: number; code_groep: number | null }[])
       if (a.artikel != null && a.code_groep != null) artMap[a.artikel] = a.code_groep
-    }
     setArtikelGroepMap(artMap)
+
+    // Licentiehouder naam map
+    const lhMap: Record<number, string> = {}
+    for (const l of (lh ?? []) as { id: number; naam: string }[]) lhMap[l.id] = l.naam
+
+    // Ras map: id → naam + lh_naam
+    const rasMap: Record<number, { naam: string; lh_naam: string }> = {}
+    for (const ras of (r ?? []) as { id: number; naam: string; licentiehouder_id: number }[])
+      rasMap[ras.id] = { naam: ras.naam, lh_naam: lhMap[ras.licentiehouder_id] ?? '–' }
+
+    // code_groep → ras info
+    const cgRasMap: Record<number, { naam: string; lh_naam: string }> = {}
+    for (const c of (cgc ?? []) as { code_groep: number; ras_id: number | null }[])
+      if (c.ras_id != null && rasMap[c.ras_id]) cgRasMap[c.code_groep] = rasMap[c.ras_id]
+    setCodeGroepRasMap(cgRasMap)
+
+    // Tarievenmap: `${code_groep}_${land}` → tarief
+    const tkMap: Record<string, number> = {}
+    for (const t of (lk ?? []) as { code_groep: number; land: string; tarief: number | null }[])
+      if (t.tarief != null) tkMap[`${t.code_groep}_${t.land}`] = t.tarief
+    setTarievenMap(tkMap)
+
     setLoading(false)
   }
   useEffect(() => { load() }, [])
@@ -91,6 +129,17 @@ export default function Omzetrekeningen() {
       const c = line.split('\t')
       const rekening = c[1]?.trim() || null
       const debiteur_nr = c[6]?.trim() ? parseInt(c[6]) || null : null
+      const artikel = c[9]?.trim() ? parseInt(c[9]) || null : null
+      const aantal = c[10]?.trim() ? parseInt(c[10]) || null : null
+      const land_debiteur = debiteur_nr != null ? (debLandMap[debiteur_nr] ?? null) : null
+      const code_groep = artikel != null ? (artikelGroepMap[artikel] ?? null) : null
+      const rasInfo = code_groep != null ? (codeGroepRasMap[code_groep] ?? null) : null
+      const licentiekosten = (code_groep != null && land_debiteur != null)
+        ? (tarievenMap[`${code_groep}_${land_debiteur}`] ?? null)
+        : null
+      const totaal_licentiekosten = (aantal != null && licentiekosten != null)
+        ? aantal * licentiekosten
+        : null
       return {
         datum: parseDate(c[0] ?? ''),
         rekening,
@@ -100,12 +149,16 @@ export default function Omzetrekeningen() {
         vv_bedrag: parseNum(c[5] ?? ''),
         debiteur_nr,
         debiteur_naam: c[7]?.trim() || null,
-        land_debiteur: debiteur_nr != null ? (debLandMap[debiteur_nr] ?? null) : null,
+        land_debiteur,
         artikel_omschrijving: c[8]?.trim() || null,
-        artikel: c[9]?.trim() ? parseInt(c[9]) || null : null,
-        aantal: c[10]?.trim() ? parseInt(c[10]) || null : null,
+        artikel,
+        aantal,
         soort: soortVanRekening(rekening),
-        code_groep: c[9]?.trim() ? (artikelGroepMap[parseInt(c[9])] ?? null) : null,
+        code_groep,
+        ras_naam: rasInfo?.naam ?? null,
+        licentiehouder_naam: rasInfo?.lh_naam ?? null,
+        licentiekosten,
+        totaal_licentiekosten,
       }
     })
     setPreview(parsed)
@@ -118,10 +171,7 @@ export default function Omzetrekeningen() {
     const { error } = await supabase.from('omzetrekeningen').insert(preview)
     if (error) { toast.error(error.message); setImporting(false); return }
     toast.success(`${preview.length} regels geïmporteerd`)
-    setImporting(false)
-    setPaste('')
-    setPreview(null)
-    load()
+    setImporting(false); setPaste(''); setPreview(null); load()
   }
 
   const remove = async (id: number) => {
@@ -143,8 +193,16 @@ export default function Omzetrekeningen() {
       (r.debiteur_naam ?? '').toLowerCase().includes(q) ||
       (r.omschrijving ?? '').toLowerCase().includes(q) ||
       (r.rekening ?? '').includes(q) ||
+      (r.ras_naam ?? '').toLowerCase().includes(q) ||
+      (r.licentiehouder_naam ?? '').toLowerCase().includes(q) ||
       String(r.debiteur_nr ?? '').includes(q)
   })
+
+  const totaalLk = filtered.reduce((s, r) => s + (r.totaal_licentiekosten ?? 0), 0)
+
+  const previewHeaders = ['Datum','Rekening','Omschrijving','Debet','Credit','V.V.','Deb. nr','Deb. naam','Land','Soort','Artikel omschr.','Artikel','Code groep','Ras','Licentiehouder','Tarief','Totaal LK','Aantal']
+  const tableHeaders  = ['Datum','Rekening','Omschrijving','Debet EUR','Credit EUR','V.V.-bedrag','Debiteur','Naam','Land','Soort','Artikel','Code groep','Ras','Licentiehouder','Tarief','Totaal LK','Aantal','']
+  const numCols = new Set(['Debet EUR','Credit EUR','V.V.-bedrag','Totaal LK','Aantal'])
 
   return (
     <>
@@ -154,7 +212,7 @@ export default function Omzetrekeningen() {
           <div className="page-sub">{rows.length} regels</div>
         </div>
         {rows.length > 0 && (
-          <button className="btn btn-ghost" style={{ color: 'var(--danger, #e53e3e)' }} onClick={removeAll}>
+          <button className="btn btn-ghost" style={{ color: 'var(--danger)' }} onClick={removeAll}>
             <Trash2 size={15} /> Alles verwijderen
           </button>
         )}
@@ -177,9 +235,7 @@ export default function Omzetrekeningen() {
           }}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-          <button className="btn btn-secondary" onClick={parsePaste} disabled={!paste.trim()}>
-            Verwerk
-          </button>
+          <button className="btn btn-secondary" onClick={parsePaste} disabled={!paste.trim()}>Verwerk</button>
           {preview && (
             <>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{preview.length} regels klaar</span>
@@ -195,8 +251,8 @@ export default function Omzetrekeningen() {
             <table style={{ fontSize: 12, width: '100%' }}>
               <thead>
                 <tr>
-                  {['Datum','Rekening','Omschrijving','Debet','Credit','V.V.','Deb. nr','Deb. naam','Land','Soort','Artikel omschr.','Artikel','Code groep','Aantal'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '4px 8px', fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--card)', zIndex: 1 }}>{h}</th>
+                  {previewHeaders.map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '4px 8px', fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -205,7 +261,7 @@ export default function Omzetrekeningen() {
                   <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
                     <td style={{ padding: '4px 8px', whiteSpace: 'nowrap', fontFamily: "'DM Mono',monospace" }}>{r.datum ?? '–'}</td>
                     <td style={{ padding: '4px 8px' }}>{r.rekening ?? '–'}</td>
-                    <td style={{ padding: '4px 8px', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.omschrijving ?? '–'}</td>
+                    <td style={{ padding: '4px 8px', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.omschrijving ?? '–'}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: "'DM Mono',monospace" }}>{fmt(r.debet_eur)}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: "'DM Mono',monospace" }}>{fmt(r.credit_eur)}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: "'DM Mono',monospace" }}>{fmt(r.vv_bedrag)}</td>
@@ -213,9 +269,13 @@ export default function Omzetrekeningen() {
                     <td style={{ padding: '4px 8px' }}>{r.debiteur_naam ?? '–'}</td>
                     <td style={{ padding: '4px 8px', fontWeight: r.land_debiteur ? 500 : undefined }}>{r.land_debiteur ?? <span style={{ color: 'var(--muted)' }}>–</span>}</td>
                     <td style={{ padding: '4px 8px' }}>{r.soort ? <span className={`badge badge-${r.soort.toLowerCase()}`}>{r.soort}</span> : '–'}</td>
-                    <td style={{ padding: '4px 8px', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.artikel_omschrijving ?? '–'}</td>
+                    <td style={{ padding: '4px 8px', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.artikel_omschrijving ?? '–'}</td>
                     <td style={{ padding: '4px 8px' }}>{r.artikel ?? '–'}</td>
                     <td style={{ padding: '4px 8px' }}>{r.code_groep ?? '–'}</td>
+                    <td style={{ padding: '4px 8px' }}>{r.ras_naam ?? <span style={{ color: 'var(--muted)' }}>–</span>}</td>
+                    <td style={{ padding: '4px 8px' }}>{r.licentiehouder_naam ?? <span style={{ color: 'var(--muted)' }}>–</span>}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: "'DM Mono',monospace" }}>{fmtTarief(r.licentiekosten)}</td>
+                    <td style={{ padding: '4px 8px', textAlign: 'right', fontFamily: "'DM Mono',monospace", fontWeight: 500 }}>{fmt(r.totaal_licentiekosten)}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right' }}>{r.aantal ?? '–'}</td>
                   </tr>
                 ))}
@@ -228,7 +288,7 @@ export default function Omzetrekeningen() {
       <div className="filters">
         <div className="search-wrap" style={{ flex: 1, maxWidth: 300 }}>
           <Search className="search-icon" />
-          <input placeholder="Zoek debiteur, omschrijving of rekening…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input placeholder="Zoek debiteur, ras, licentiehouder…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 
@@ -237,19 +297,19 @@ export default function Omzetrekeningen() {
           <table>
             <thead>
               <tr>
-                {['Datum','Rekening','Omschrijving','Debet EUR','Credit EUR','V.V.-bedrag','Debiteur','Naam','Land','Soort','Artikel','Code groep','Aantal',''].map(h => (
-                  <th key={h} className={['Debet EUR','Credit EUR','V.V.-bedrag','Aantal'].includes(h) ? 'num' : ''} style={{ position: 'sticky', top: 0, zIndex: 1 }}>{h}</th>
+                {tableHeaders.map(h => (
+                  <th key={h} className={numCols.has(h) ? 'num' : ''} style={{ position: 'sticky', top: 0, zIndex: 1 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={14} className="empty">Laden…</td></tr>}
-              {!loading && filtered.length === 0 && <tr><td colSpan={14} className="empty">Geen regels gevonden</td></tr>}
+              {loading && <tr><td colSpan={tableHeaders.length} className="empty">Laden…</td></tr>}
+              {!loading && filtered.length === 0 && <tr><td colSpan={tableHeaders.length} className="empty">Geen regels gevonden</td></tr>}
               {filtered.map(r => (
                 <tr key={r.id}>
                   <td className="mono" style={{ whiteSpace: 'nowrap' }}>{r.datum ?? '–'}</td>
                   <td className="mono text-muted" style={{ fontSize: 12 }}>{r.rekening ?? '–'}</td>
-                  <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.omschrijving ?? '–'}</td>
+                  <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.omschrijving ?? '–'}</td>
                   <td className="num">{fmt(r.debet_eur)}</td>
                   <td className="num">{fmt(r.credit_eur)}</td>
                   <td className="num">{fmt(r.vv_bedrag)}</td>
@@ -258,12 +318,25 @@ export default function Omzetrekeningen() {
                   <td>{r.land_debiteur ?? <span className="text-muted">–</span>}</td>
                   <td>{r.soort ? <span className={`badge badge-${r.soort.toLowerCase()}`}>{r.soort}</span> : <span className="text-muted">–</span>}</td>
                   <td className="mono text-muted" style={{ fontSize: 12 }}>{r.artikel ?? '–'}</td>
-                  <td className="mono text-muted" style={{ fontSize: 12 }}>{r.code_groep ?? <span className="text-muted">–</span>}</td>
+                  <td className="mono text-muted" style={{ fontSize: 12 }}>{r.code_groep ?? '–'}</td>
+                  <td>{r.ras_naam ?? <span className="text-muted">–</span>}</td>
+                  <td className="text-muted" style={{ fontSize: 12 }}>{r.licentiehouder_naam ?? '–'}</td>
+                  <td className="mono" style={{ fontSize: 12 }}>{fmtTarief(r.licentiekosten)}</td>
+                  <td className="num" style={{ fontWeight: 500 }}>{fmt(r.totaal_licentiekosten)}</td>
                   <td className="num">{r.aantal?.toLocaleString('nl-NL') ?? '–'}</td>
                   <td><button className="btn btn-ghost" onClick={() => remove(r.id)}><Trash2 /></button></td>
                 </tr>
               ))}
             </tbody>
+            {filtered.length > 0 && (
+              <tfoot>
+                <tr>
+                  <td colSpan={15}>Totaal ({filtered.length} regels)</td>
+                  <td className="num">{fmt(totaalLk)}</td>
+                  <td colSpan={2}></td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </div>
