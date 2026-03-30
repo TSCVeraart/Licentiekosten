@@ -18,6 +18,13 @@ export default function Debiteuren() {
   const [importRows, setImportRows] = useState<{nummer:string,naam:string,land:string}[]>([])
   const [importing, setImporting] = useState(false)
   const [paste, setPaste] = useState('')
+  const [sortCol, setSortCol] = useState<'nummer'|'naam'|'land'|'actief'>('naam')
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
+
+  const handleSort = (col: typeof sortCol) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
 
   const load = async () => {
     const { data } = await supabase.from('debiteuren').select('*').order('naam')
@@ -29,6 +36,10 @@ export default function Debiteuren() {
     const q = search.toLowerCase()
     return (!q || r.naam.toLowerCase().includes(q) || r.nummer.includes(q)) &&
       (!filterLand || r.land === filterLand)
+  }).sort((a, b) => {
+    const av = sortCol === 'actief' ? (a.actief ? 1 : 0) : (a[sortCol] ?? '').toString().toLowerCase()
+    const bv = sortCol === 'actief' ? (b.actief ? 1 : 0) : (b[sortCol] ?? '').toString().toLowerCase()
+    return sortDir === 'asc' ? (av > bv ? 1 : av < bv ? -1 : 0) : (av < bv ? 1 : av > bv ? -1 : 0)
   })
 
   const save = async () => {
@@ -129,9 +140,16 @@ export default function Debiteuren() {
       </div>
 
       <div className="card">
-        <div className="table-wrap">
+        <div className="table-wrap" style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
           <table>
-            <thead><tr><th>Nummer</th><th>Naam</th><th>Land</th><th>Status</th><th></th></tr></thead>
+            <thead><tr>
+              {([['nummer','Nummer'],['naam','Naam'],['land','Land'],['actief','Status']] as const).map(([col, label]) => (
+                <th key={col} onClick={() => handleSort(col)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  {label} {sortCol === col ? (sortDir === 'asc' ? '↑' : '↓') : <span style={{ opacity: 0.3 }}>↕</span>}
+                </th>
+              ))}
+              <th></th>
+            </tr></thead>
             <tbody>
               {loading && <tr><td colSpan={5} className="empty">Laden…</td></tr>}
               {!loading && filtered.length === 0 && <tr><td colSpan={5} className="empty">Geen debiteuren gevonden</td></tr>}
