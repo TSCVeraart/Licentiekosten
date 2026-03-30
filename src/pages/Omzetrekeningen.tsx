@@ -18,6 +18,7 @@ interface Omzetrekening {
   artikel: number | null
   aantal: number | null
   soort: SoortPlant | null
+  code_groep: number | null
   created_at: string
 }
 
@@ -54,6 +55,7 @@ const fmt = (v: number | null) =>
 export default function Omzetrekeningen() {
   const [rows, setRows] = useState<Omzetrekening[]>([])
   const [debLandMap, setDebLandMap] = useState<Record<number, string>>({})
+  const [artikelGroepMap, setArtikelGroepMap] = useState<Record<number, number>>({})
   const [loading, setLoading] = useState(true)
   const [paste, setPaste] = useState('')
   const [preview, setPreview] = useState<RawRow[] | null>(null)
@@ -61,17 +63,23 @@ export default function Omzetrekeningen() {
   const [search, setSearch] = useState('')
 
   const load = async () => {
-    const [{ data }, { data: deb }] = await Promise.all([
+    const [{ data }, { data: deb }, { data: art }] = await Promise.all([
       supabase.from('omzetrekeningen').select('*').order('datum', { ascending: false }).limit(2000),
       supabase.from('debiteuren').select('nummer, land'),
+      supabase.from('artikel_codes').select('artikel, code_groep'),
     ])
     setRows((data ?? []) as Omzetrekening[])
-    const map: Record<number, string> = {}
+    const debMap: Record<number, string> = {}
     for (const d of (deb ?? []) as { nummer: string; land: string }[]) {
       const nr = parseInt(d.nummer)
-      if (!isNaN(nr)) map[nr] = d.land
+      if (!isNaN(nr)) debMap[nr] = d.land
     }
-    setDebLandMap(map)
+    setDebLandMap(debMap)
+    const artMap: Record<number, number> = {}
+    for (const a of (art ?? []) as { artikel: number; code_groep: number | null }[]) {
+      if (a.artikel != null && a.code_groep != null) artMap[a.artikel] = a.code_groep
+    }
+    setArtikelGroepMap(artMap)
     setLoading(false)
   }
   useEffect(() => { load() }, [])
@@ -97,6 +105,7 @@ export default function Omzetrekeningen() {
         artikel: c[9]?.trim() ? parseInt(c[9]) || null : null,
         aantal: c[10]?.trim() ? parseInt(c[10]) || null : null,
         soort: soortVanRekening(rekening),
+        code_groep: c[9]?.trim() ? (artikelGroepMap[parseInt(c[9])] ?? null) : null,
       }
     })
     setPreview(parsed)
@@ -186,7 +195,7 @@ export default function Omzetrekeningen() {
             <table style={{ fontSize: 12, width: '100%' }}>
               <thead>
                 <tr>
-                  {['Datum','Rekening','Omschrijving','Debet','Credit','V.V.','Deb. nr','Deb. naam','Land','Soort','Artikel omschr.','Artikel','Aantal'].map(h => (
+                  {['Datum','Rekening','Omschrijving','Debet','Credit','V.V.','Deb. nr','Deb. naam','Land','Soort','Artikel omschr.','Artikel','Code groep','Aantal'].map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: '4px 8px', fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--card)', zIndex: 1 }}>{h}</th>
                   ))}
                 </tr>
@@ -206,6 +215,7 @@ export default function Omzetrekeningen() {
                     <td style={{ padding: '4px 8px' }}>{r.soort ? <span className={`badge badge-${r.soort.toLowerCase()}`}>{r.soort}</span> : '–'}</td>
                     <td style={{ padding: '4px 8px', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.artikel_omschrijving ?? '–'}</td>
                     <td style={{ padding: '4px 8px' }}>{r.artikel ?? '–'}</td>
+                    <td style={{ padding: '4px 8px' }}>{r.code_groep ?? '–'}</td>
                     <td style={{ padding: '4px 8px', textAlign: 'right' }}>{r.aantal ?? '–'}</td>
                   </tr>
                 ))}
@@ -227,14 +237,14 @@ export default function Omzetrekeningen() {
           <table>
             <thead>
               <tr>
-                {['Datum','Rekening','Omschrijving','Debet EUR','Credit EUR','V.V.-bedrag','Debiteur','Naam','Land','Soort','Artikel','Aantal',''].map(h => (
+                {['Datum','Rekening','Omschrijving','Debet EUR','Credit EUR','V.V.-bedrag','Debiteur','Naam','Land','Soort','Artikel','Code groep','Aantal',''].map(h => (
                   <th key={h} className={['Debet EUR','Credit EUR','V.V.-bedrag','Aantal'].includes(h) ? 'num' : ''} style={{ position: 'sticky', top: 0, zIndex: 1 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={13} className="empty">Laden…</td></tr>}
-              {!loading && filtered.length === 0 && <tr><td colSpan={13} className="empty">Geen regels gevonden</td></tr>}
+              {loading && <tr><td colSpan={14} className="empty">Laden…</td></tr>}
+              {!loading && filtered.length === 0 && <tr><td colSpan={14} className="empty">Geen regels gevonden</td></tr>}
               {filtered.map(r => (
                 <tr key={r.id}>
                   <td className="mono" style={{ whiteSpace: 'nowrap' }}>{r.datum ?? '–'}</td>
@@ -248,6 +258,7 @@ export default function Omzetrekeningen() {
                   <td>{r.land_debiteur ?? <span className="text-muted">–</span>}</td>
                   <td>{r.soort ? <span className={`badge badge-${r.soort.toLowerCase()}`}>{r.soort}</span> : <span className="text-muted">–</span>}</td>
                   <td className="mono text-muted" style={{ fontSize: 12 }}>{r.artikel ?? '–'}</td>
+                  <td className="mono text-muted" style={{ fontSize: 12 }}>{r.code_groep ?? <span className="text-muted">–</span>}</td>
                   <td className="num">{r.aantal?.toLocaleString('nl-NL') ?? '–'}</td>
                   <td><button className="btn btn-ghost" onClick={() => remove(r.id)}><Trash2 /></button></td>
                 </tr>
