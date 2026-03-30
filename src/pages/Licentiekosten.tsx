@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Ras, type Licentiehouder } from '../lib/supabase'
 
@@ -12,9 +12,13 @@ export default function Licentiekosten() {
   const [rassen, setRassen] = useState<RasDetail[]>([])
   const [tarieven, setTarieven] = useState<Record<string, number | null>>({})
   const [loading, setLoading] = useState(true)
+  const [collapsed, setCollapsed] = useState<Set<number>>(new Set())
   const [bulkVal, setBulkVal] = useState<Record<number, string>>({})
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
+
+  const toggleCollapse = (code_groep: number) =>
+    setCollapsed(prev => { const next = new Set(prev); next.has(code_groep) ? next.delete(code_groep) : next.add(code_groep); return next })
 
   const load = async () => {
     const [{ data: ak }, { data: cgc }, { data: r }, { data: rl }, { data: lh }, { data: lk }] = await Promise.all([
@@ -108,12 +112,16 @@ export default function Licentiekosten() {
           const rasId = rasConfigs[cg.code_groep] ?? null
           const ras = rassen.find(r => r.id === rasId) ?? null
           const landen = ras?.landen ?? []
+          const isCollapsed = collapsed.has(cg.code_groep)
 
           return (
             <div key={cg.code_groep} className="card">
               {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', flexWrap: 'wrap', borderBottom: ras ? '1px solid var(--border)' : undefined }}>
-                <span className="mono" style={{ fontSize: 14, fontWeight: 600 }}>{cg.code_groep}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', flexWrap: 'wrap', borderBottom: ras && !isCollapsed ? '1px solid var(--border)' : undefined }}>
+                <span onClick={() => toggleCollapse(cg.code_groep)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {isCollapsed ? <ChevronRight size={15} color="var(--muted)" /> : <ChevronDown size={15} color="var(--muted)" />}
+                  <span className="mono" style={{ fontSize: 14, fontWeight: 600 }}>{cg.code_groep}</span>
+                </span>
                 <span style={{ flex: 1, fontSize: 13 }}>{cg.omschrijving ?? '–'}</span>
                 <select
                   value={rasId ?? ''}
@@ -129,7 +137,7 @@ export default function Licentiekosten() {
               </div>
 
               {/* Landen & tarieven */}
-              {ras && landen.length > 0 && (
+              {ras && landen.length > 0 && !isCollapsed && (
                 <div style={{ padding: '10px 16px' }}>
                   {/* Snel invullen */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -197,7 +205,7 @@ export default function Licentiekosten() {
                 </div>
               )}
 
-              {ras && landen.length === 0 && (
+              {ras && landen.length === 0 && !isCollapsed && (
                 <div style={{ padding: '10px 16px', fontSize: 12, color: 'var(--muted)' }}>
                   Geen landen gekoppeld aan dit ras
                 </div>
