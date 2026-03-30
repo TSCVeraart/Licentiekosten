@@ -17,7 +17,7 @@ a{color:inherit;text-decoration:none}
 .page-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:28px;gap:16px;position:sticky;top:0;z-index:20;background:var(--bg);padding-top:32px;margin-top:-32px;padding-bottom:16px;margin-bottom:12px}
 .page-title{font-size:22px;font-weight:500;letter-spacing:-0.02em}
 .page-sub{font-size:13px;color:var(--muted);margin-top:3px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:clip}
 .card-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}
 .card-title{font-size:13.5px;font-weight:500}
 .card-body{padding:20px}
