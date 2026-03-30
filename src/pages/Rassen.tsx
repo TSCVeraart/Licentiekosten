@@ -21,6 +21,13 @@ export default function Rassen() {
   const [nieuwLand, setNieuwLand] = useState('')
   const [editId, setEditId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
+  const [sortCol, setSortCol] = useState<'naam' | 'licentiehouder_naam' | 'soort' | 'landen' | 'actief'>('naam')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  const handleSort = (col: typeof sortCol) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
 
   const load = async () => {
     const [{ data: r }, { data: lh }] = await Promise.all([
@@ -43,6 +50,12 @@ export default function Rassen() {
     return (!q || r.naam.toLowerCase().includes(q)) &&
       (!filterLh || r.licentiehouder_id === Number(filterLh)) &&
       (!filterSoort || r.soort === filterSoort)
+  }).sort((a, b) => {
+    let av: string | number, bv: string | number
+    if (sortCol === 'landen') { av = a.landen?.length ?? 0; bv = b.landen?.length ?? 0 }
+    else if (sortCol === 'actief') { av = a.actief ? 1 : 0; bv = b.actief ? 1 : 0 }
+    else { av = (a[sortCol] ?? '').toString().toLowerCase(); bv = (b[sortCol] ?? '').toString().toLowerCase() }
+    return sortDir === 'asc' ? (av > bv ? 1 : av < bv ? -1 : 0) : (av < bv ? 1 : av > bv ? -1 : 0)
   })
 
   const toggleLand = (land: string) => {
@@ -143,11 +156,11 @@ export default function Rassen() {
         <div className="table-wrap" style={{ maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' }}>
           <table>
             <thead><tr>
-              <th>Ras</th>
-              <th>Licentiehouder</th>
-              <th>Soort</th>
-              <th>Landen</th>
-              <th>Status</th>
+              {([['naam','Ras'],['licentiehouder_naam','Licentiehouder'],['soort','Soort'],['landen','Landen'],['actief','Status']] as const).map(([col, label]) => (
+                <th key={col} onClick={() => handleSort(col)} style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                  {label} {sortCol === col ? (sortDir === 'asc' ? '↑' : '↓') : <span style={{ opacity: 0.3 }}>↕</span>}
+                </th>
+              ))}
               <th></th>
             </tr></thead>
             <tbody>
