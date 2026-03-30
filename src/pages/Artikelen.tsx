@@ -7,7 +7,7 @@ interface ArtikelCode {
   id: number
   artikel: number | null
   omschrijving: string | null
-  code_groep: string | null
+  code_groep: number | null
   created_at: string
 }
 
@@ -20,6 +20,8 @@ export default function Artikelen() {
   const [preview, setPreview] = useState<RawRow[] | null>(null)
   const [importing, setImporting] = useState(false)
   const [search, setSearch] = useState('')
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editVal, setEditVal] = useState('')
 
   const load = async () => {
     const { data } = await supabase
@@ -64,6 +66,14 @@ export default function Artikelen() {
     toast.success('Verwijderd'); load()
   }
 
+  const saveCodeGroep = async (id: number) => {
+    const val = editVal.trim() ? parseInt(editVal) || null : null
+    const { error } = await supabase.from('artikel_codes').update({ code_groep: val }).eq('id', id)
+    if (error) { toast.error(error.message); return }
+    setEditingId(null)
+    setRows(prev => prev.map(r => r.id === id ? { ...r, code_groep: val } : r))
+  }
+
   const removeAll = async () => {
     if (!confirm(`Alle ${rows.length} artikelen verwijderen?`)) return
     const { error } = await supabase.from('artikel_codes').delete().gte('id', 0)
@@ -76,7 +86,7 @@ export default function Artikelen() {
     return !q ||
       String(r.artikel ?? '').includes(q) ||
       (r.omschrijving ?? '').toLowerCase().includes(q) ||
-      (r.code_groep ?? '').toLowerCase().includes(q)
+      String(r.code_groep ?? '').includes(q)
   })
 
   return (
@@ -171,7 +181,23 @@ export default function Artikelen() {
                 <tr key={r.id}>
                   <td className="mono">{r.artikel ?? '–'}</td>
                   <td>{r.omschrijving ?? '–'}</td>
-                  <td>{r.code_groep ?? <span className="text-muted">–</span>}</td>
+                  <td onClick={() => { setEditingId(r.id); setEditVal(r.code_groep != null ? String(r.code_groep) : '') }} style={{ cursor: 'pointer', minWidth: 100 }}>
+                    {editingId === r.id
+                      ? <input
+                          type="number"
+                          value={editVal}
+                          autoFocus
+                          onChange={e => setEditVal(e.target.value)}
+                          onBlur={() => saveCodeGroep(r.id)}
+                          onKeyDown={e => { if (e.key === 'Enter') saveCodeGroep(r.id); if (e.key === 'Escape') setEditingId(null) }}
+                          style={{ width: 90, padding: '2px 6px', fontSize: 13 }}
+                          onClick={e => e.stopPropagation()}
+                        />
+                      : r.code_groep != null
+                        ? <span className="mono">{r.code_groep}</span>
+                        : <span className="text-muted" style={{ fontSize: 12 }}>klik om in te vullen</span>
+                    }
+                  </td>
                   <td><button className="btn btn-ghost" onClick={() => remove(r.id)}><Trash2 /></button></td>
                 </tr>
               ))}
