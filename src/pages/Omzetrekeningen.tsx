@@ -227,20 +227,49 @@ export default function Omzetrekeningen() {
   }
   useEffect(() => { load() }, [])
 
-  const parsePaste = () => {
+  const parsePaste = async () => {
     const lines = paste.trim().split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim())
     if (!lines.length) { toast.error('Geen data geplakt'); return }
+
+    // Haal verse referentiedata op zodat nieuwe debiteuren/landen direct meegenomen worden
+    const [{ data: freshDeb }, { data: freshArt }, { data: freshCgc }, { data: freshR }, { data: freshLh }, { data: freshLk }] = await Promise.all([
+      supabase.from('debiteuren').select('nummer, land').range(0, 9999),
+      supabase.from('artikel_codes').select('artikel, code_groep'),
+      supabase.from('code_groep_config').select('code_groep, ras_id'),
+      supabase.from('rassen').select('id, naam, licentiehouder_id'),
+      supabase.from('licentiehouders').select('id, naam'),
+      supabase.from('licentiekosten').select('code_groep, land, tarief'),
+    ])
+    const freshDebMap: Record<number, string> = {}
+    for (const d of (freshDeb ?? []) as { nummer: string; land: string }[]) {
+      const nr = parseInt(d.nummer); if (!isNaN(nr)) freshDebMap[nr] = d.land
+    }
+    const freshArtMap: Record<number, number> = {}
+    for (const a of (freshArt ?? []) as { artikel: number; code_groep: number | null }[])
+      if (a.artikel != null && a.code_groep != null) freshArtMap[a.artikel] = a.code_groep
+    const freshLhMap: Record<number, string> = {}
+    for (const l of (freshLh ?? []) as { id: number; naam: string }[]) freshLhMap[l.id] = l.naam
+    const freshRasMap: Record<number, { naam: string; lh_naam: string }> = {}
+    for (const ras of (freshR ?? []) as { id: number; naam: string; licentiehouder_id: number }[])
+      freshRasMap[ras.id] = { naam: ras.naam, lh_naam: freshLhMap[ras.licentiehouder_id] ?? '–' }
+    const freshCgRasMap: Record<number, { naam: string; lh_naam: string }> = {}
+    for (const c of (freshCgc ?? []) as { code_groep: number; ras_id: number | null }[])
+      if (c.ras_id != null && freshRasMap[c.ras_id]) freshCgRasMap[c.code_groep] = freshRasMap[c.ras_id]
+    const freshTkMap: Record<string, number> = {}
+    for (const t of (freshLk ?? []) as { code_groep: number; land: string; tarief: number | null }[])
+      if (t.tarief != null) freshTkMap[`${t.code_groep}_${t.land}`] = t.tarief
+
     const parsed: RawRow[] = lines.map(line => {
       const c = line.split('\t')
       const rekening = c[1]?.trim() || null
       const debiteur_nr = c[6]?.trim() ? parseInt(c[6]) || null : null
       const artikel = c[9]?.trim() ? parseInt(c[9]) || null : null
       const aantal = c[10]?.trim() ? parseInt(c[10]) || null : null
-      const land_debiteur = debiteur_nr != null ? (debLandMap[debiteur_nr] ?? null) : null
-      const code_groep = artikel != null ? (artikelGroepMap[artikel] ?? null) : null
-      const rasInfo = code_groep != null ? (codeGroepRasMap[code_groep] ?? null) : null
+      const land_debiteur = debiteur_nr != null ? (freshDebMap[debiteur_nr] ?? null) : null
+      const code_groep = artikel != null ? (freshArtMap[artikel] ?? null) : null
+      const rasInfo = code_groep != null ? (freshCgRasMap[code_groep] ?? null) : null
       const licentiekosten = (code_groep != null && land_debiteur != null)
-        ? (tarievenMap[`${code_groep}_${land_debiteur}`] ?? null)
+        ? (freshTkMap[`${code_groep}_${land_debiteur}`] ?? null)
         : null
       const totaal_licentiekosten = (aantal != null && licentiekosten != null)
         ? aantal * licentiekosten
