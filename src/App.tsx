@@ -1,11 +1,12 @@
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, Leaf, Package, ArrowUpDown, BookOpen } from 'lucide-react'
+import { LayoutDashboard, Users, Leaf, Package, ArrowUpDown, BookOpen, TrendingUp } from 'lucide-react'
 import Dashboard from './pages/Dashboard'
 import Debiteuren from './pages/Debiteuren'
 import Licentiehouders from './pages/Licentiehouders'
 import Rassen from './pages/Rassen'
 import Transacties from './pages/Transacties'
 import Grootboek from './pages/Grootboek'
+import Omzetrekeningen from './pages/Omzetrekeningen'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <div className="nav-section">Boekingen</div>
           <NavLink to="/transacties" className={({isActive}) => `nav-link ${isActive?'active':''}`}><ArrowUpDown />Transacties</NavLink>
           <NavLink to="/grootboek" className={({isActive}) => `nav-link ${isActive?'active':''}`}><BookOpen />Grootboek 1955</NavLink>
+          <NavLink to="/omzetrekeningen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><TrendingUp />Omzetrekeningen</NavLink>
         </nav>
       </aside>
       <main className="main">
@@ -33,6 +35,7 @@ export default function App() {
             <Route path="/rassen" element={<Rassen />} />
             <Route path="/transacties" element={<Transacties />} />
             <Route path="/grootboek" element={<Grootboek />} />
+            <Route path="/omzetrekeningen" element={<Omzetrekeningen />} />
           </Routes>
         </div>
       </main>
