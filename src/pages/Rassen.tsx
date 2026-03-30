@@ -23,16 +23,14 @@ export default function Rassen() {
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
-    const [{ data: r }, { data: lh }, { data: rl }] = await Promise.all([
-      supabase.from('rassen').select('*, licentiehouders(naam)').order('naam'),
+    const [{ data: r }, { data: lh }] = await Promise.all([
+      supabase.from('rassen').select('*, licentiehouders(naam), ras_landen(land)').order('naam'),
       supabase.from('licentiehouders').select('id, naam').order('naam'),
-      supabase.from('ras_landen').select('*').limit(10000),
     ])
-    const rasLanden = (rl ?? []) as { ras_id: number; land: string }[]
     const mapped = (r ?? []).map((x: any) => ({
       ...x,
       licentiehouder_naam: x.licentiehouders?.naam,
-      landen: rasLanden.filter(l => l.ras_id === x.id).map(l => l.land),
+      landen: (x.ras_landen ?? []).map((l: any) => l.land),
     }))
     setRassen(mapped)
     setLhList((lh ?? []) as Licentiehouder[])
