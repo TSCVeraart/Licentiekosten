@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Upload, Trash2, Search } from 'lucide-react'
+import { MultiSelect } from '../lib/MultiSelect'
 import toast from 'react-hot-toast'
 import { supabase, type SoortPlant } from '../lib/supabase'
 
@@ -105,11 +106,11 @@ export default function Omzetrekeningen() {
   )
   const [dragKey, setDragKey] = useState<string | null>(null)
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
-  const [filterSoort, setFilterSoort] = useState('')
-  const [filterLand, setFilterLand] = useState('')
-  const [filterRas, setFilterRas] = useState('')
-  const [filterLh, setFilterLh] = useState('')
-  const [filterType, setFilterType] = useState('')
+  const [filterSoort, setFilterSoort] = useState<string[]>([])
+  const [filterLand, setFilterLand] = useState<string[]>([])
+  const [filterRas, setFilterRas] = useState<string[]>([])
+  const [filterLh, setFilterLh] = useState<string[]>([])
+  const [filterType, setFilterType] = useState<string[]>([])
   const [filterDatumVan, setFilterDatumVan] = useState('')
   const [filterDatumTot, setFilterDatumTot] = useState('')
   const [sortCol, setSortCol] = useState<string | null>(null)
@@ -296,11 +297,11 @@ export default function Omzetrekeningen() {
     const q = search.toLowerCase()
     return (
       (!q || (r.debiteur_naam ?? '').toLowerCase().includes(q) || (r.omschrijving ?? '').toLowerCase().includes(q) || (r.rekening ?? '').includes(q) || (r.ras_naam ?? '').toLowerCase().includes(q) || (r.licentiehouder_naam ?? '').toLowerCase().includes(q) || String(r.debiteur_nr ?? '').includes(q)) &&
-      (!filterSoort || r.soort === filterSoort) &&
-      (!filterLand || r.land_debiteur === filterLand) &&
-      (!filterRas || r.ras_naam === filterRas) &&
-      (!filterLh || r.licentiehouder_naam === filterLh) &&
-      (!filterType || r.intern_extern === filterType) &&
+      (!filterSoort.length || filterSoort.includes(r.soort ?? '')) &&
+      (!filterLand.length  || filterLand.includes(r.land_debiteur ?? '')) &&
+      (!filterRas.length   || filterRas.includes(r.ras_naam ?? '')) &&
+      (!filterLh.length    || filterLh.includes(r.licentiehouder_naam ?? '')) &&
+      (!filterType.length  || filterType.includes(r.intern_extern ?? '')) &&
       (!filterDatumVan || (r.datum ?? '') >= filterDatumVan) &&
       (!filterDatumTot || (r.datum ?? '') <= filterDatumTot)
     )
@@ -405,28 +406,13 @@ export default function Omzetrekeningen() {
         </div>
         <input type="date" value={filterDatumVan} onChange={e => setFilterDatumVan(e.target.value)} style={{ width: 'auto' }} title="Datum van" />
         <input type="date" value={filterDatumTot} onChange={e => setFilterDatumTot(e.target.value)} style={{ width: 'auto' }} title="Datum tot" />
-        <select value={filterSoort} onChange={e => setFilterSoort(e.target.value)}>
-          <option value="">Alle soorten</option>
-          {[...new Set(rows.map(r => r.soort).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
-        </select>
-        <select value={filterLand} onChange={e => setFilterLand(e.target.value)}>
-          <option value="">Alle landen</option>
-          {[...new Set(rows.map(r => r.land_debiteur).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
-        </select>
-        <select value={filterRas} onChange={e => setFilterRas(e.target.value)}>
-          <option value="">Alle rassen</option>
-          {[...new Set(rows.map(r => r.ras_naam).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
-        </select>
-        <select value={filterLh} onChange={e => setFilterLh(e.target.value)}>
-          <option value="">Alle licentiehouders</option>
-          {[...new Set(rows.map(r => r.licentiehouder_naam).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
-        </select>
-        <select value={filterType} onChange={e => setFilterType(e.target.value)}>
-          <option value="">Alle types</option>
-          {[...new Set(rows.map(r => r.intern_extern).filter(Boolean))].sort().map(v => <option key={v!} value={v!}>{v}</option>)}
-        </select>
-        {(filterSoort || filterLand || filterRas || filterLh || filterType || filterDatumVan || filterDatumTot) && (
-          <button className="btn btn-ghost" onClick={() => { setFilterSoort(''); setFilterLand(''); setFilterRas(''); setFilterLh(''); setFilterType(''); setFilterDatumVan(''); setFilterDatumTot('') }}>Wis filters</button>
+        <MultiSelect label="Soorten"          options={[...new Set(rows.map(r => r.soort).filter(Boolean) as string[])].sort()}            selected={filterSoort} onChange={setFilterSoort} />
+        <MultiSelect label="Landen"           options={[...new Set(rows.map(r => r.land_debiteur).filter(Boolean) as string[])].sort()}     selected={filterLand}  onChange={setFilterLand} />
+        <MultiSelect label="Rassen"           options={[...new Set(rows.map(r => r.ras_naam).filter(Boolean) as string[])].sort()}          selected={filterRas}   onChange={setFilterRas} />
+        <MultiSelect label="Licentiehouders"  options={[...new Set(rows.map(r => r.licentiehouder_naam).filter(Boolean) as string[])].sort()} selected={filterLh}  onChange={setFilterLh} />
+        <MultiSelect label="Types"            options={[...new Set(rows.map(r => r.intern_extern).filter(Boolean) as string[])].sort()}      selected={filterType}  onChange={setFilterType} />
+        {(filterSoort.length || filterLand.length || filterRas.length || filterLh.length || filterType.length || filterDatumVan || filterDatumTot) && (
+          <button className="btn btn-ghost" onClick={() => { setFilterSoort([]); setFilterLand([]); setFilterRas([]); setFilterLh([]); setFilterType([]); setFilterDatumVan(''); setFilterDatumTot('') }}>Wis filters</button>
         )}
       </div>
 

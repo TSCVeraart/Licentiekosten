@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { MultiSelect } from '../lib/MultiSelect'
 
 interface OmzetRow {
   datum: string | null
@@ -22,11 +23,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [filterDatumVan, setFilterDatumVan] = useState('')
   const [filterDatumTot, setFilterDatumTot] = useState('')
-  const [filterLh, setFilterLh] = useState('')
-  const [filterSoort, setFilterSoort] = useState('')
-  const [filterRas, setFilterRas] = useState('')
-  const [filterLand, setFilterLand] = useState('')
-  const [filterType, setFilterType] = useState('')
+  const [filterLh, setFilterLh] = useState<string[]>([])
+  const [filterSoort, setFilterSoort] = useState<string[]>([])
+  const [filterRas, setFilterRas] = useState<string[]>([])
+  const [filterLand, setFilterLand] = useState<string[]>([])
+  const [filterType, setFilterType] = useState<string[]>([])
   const [groupBy, setGroupBy] = useState<GroupBy>('maand')
 
   useEffect(() => {
@@ -53,11 +54,11 @@ export default function Dashboard() {
   const filtered = rows.filter(r =>
     (!filterDatumVan || (r.datum ?? '') >= filterDatumVan) &&
     (!filterDatumTot || (r.datum ?? '') <= filterDatumTot) &&
-    (!filterLh    || r.licentiehouder_naam === filterLh) &&
-    (!filterSoort || r.soort === filterSoort) &&
-    (!filterRas   || r.ras_naam === filterRas) &&
-    (!filterLand  || r.land_debiteur === filterLand) &&
-    (!filterType  || r.intern_extern === filterType)
+    (!filterLh.length    || filterLh.includes(r.licentiehouder_naam ?? '')) &&
+    (!filterSoort.length || filterSoort.includes(r.soort ?? '')) &&
+    (!filterRas.length   || filterRas.includes(r.ras_naam ?? '')) &&
+    (!filterLand.length  || filterLand.includes(r.land_debiteur ?? '')) &&
+    (!filterType.length  || filterType.includes(r.intern_extern ?? ''))
   )
 
   const totLk    = filtered.reduce((s, r) => s + (r.totaal_licentiekosten ?? 0), 0)
@@ -85,8 +86,8 @@ export default function Dashboard() {
   const uniq = (fn: (r: OmzetRow) => string | null) =>
     [...new Set(rows.map(fn).filter(Boolean) as string[])].sort()
 
-  const hasFilters = filterDatumVan || filterDatumTot || filterLh || filterSoort || filterRas || filterLand || filterType
-  const clearFilters = () => { setFilterDatumVan(''); setFilterDatumTot(''); setFilterLh(''); setFilterSoort(''); setFilterRas(''); setFilterLand(''); setFilterType('') }
+  const hasFilters = filterDatumVan || filterDatumTot || filterLh.length || filterSoort.length || filterRas.length || filterLand.length || filterType.length
+  const clearFilters = () => { setFilterDatumVan(''); setFilterDatumTot(''); setFilterLh([]); setFilterSoort([]); setFilterRas([]); setFilterLand([]); setFilterType([]) }
 
   const GROUPS: { key: GroupBy; label: string }[] = [
     { key: 'maand',          label: 'Maand' },
@@ -109,26 +110,11 @@ export default function Dashboard() {
       <div className="filters">
         <input type="date" value={filterDatumVan} onChange={e => setFilterDatumVan(e.target.value)} style={{ width: 'auto' }} title="Datum van" />
         <input type="date" value={filterDatumTot} onChange={e => setFilterDatumTot(e.target.value)} style={{ width: 'auto' }} title="Datum tot" />
-        <select value={filterLh} onChange={e => setFilterLh(e.target.value)}>
-          <option value="">Alle licentiehouders</option>
-          {uniq(r => r.licentiehouder_naam).map(v => <option key={v} value={v}>{v}</option>)}
-        </select>
-        <select value={filterSoort} onChange={e => setFilterSoort(e.target.value)}>
-          <option value="">Alle soorten</option>
-          {uniq(r => r.soort).map(v => <option key={v} value={v}>{v}</option>)}
-        </select>
-        <select value={filterRas} onChange={e => setFilterRas(e.target.value)}>
-          <option value="">Alle rassen</option>
-          {uniq(r => r.ras_naam).map(v => <option key={v} value={v}>{v}</option>)}
-        </select>
-        <select value={filterLand} onChange={e => setFilterLand(e.target.value)}>
-          <option value="">Alle landen</option>
-          {uniq(r => r.land_debiteur).map(v => <option key={v} value={v}>{v}</option>)}
-        </select>
-        <select value={filterType} onChange={e => setFilterType(e.target.value)}>
-          <option value="">Alle types</option>
-          {uniq(r => r.intern_extern).map(v => <option key={v} value={v}>{v}</option>)}
-        </select>
+        <MultiSelect label="Licentiehouders" options={uniq(r => r.licentiehouder_naam)} selected={filterLh} onChange={setFilterLh} />
+        <MultiSelect label="Soorten" options={uniq(r => r.soort)} selected={filterSoort} onChange={setFilterSoort} />
+        <MultiSelect label="Rassen" options={uniq(r => r.ras_naam)} selected={filterRas} onChange={setFilterRas} />
+        <MultiSelect label="Landen" options={uniq(r => r.land_debiteur)} selected={filterLand} onChange={setFilterLand} />
+        <MultiSelect label="Types" options={uniq(r => r.intern_extern)} selected={filterType} onChange={setFilterType} />
         {hasFilters && <button className="btn btn-ghost" onClick={clearFilters}>Wis filters</button>}
       </div>
 
