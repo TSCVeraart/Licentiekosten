@@ -231,9 +231,18 @@ export default function Omzetrekeningen() {
     const lines = paste.trim().split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim())
     if (!lines.length) { toast.error('Geen data geplakt'); return }
 
-    // Haal verse referentiedata op zodat nieuwe debiteuren/landen direct meegenomen worden
-    const [{ data: freshDeb }, { data: freshArt }, { data: freshCgc }, { data: freshR }, { data: freshLh }, { data: freshLk }] = await Promise.all([
-      supabase.from('debiteuren').select('nummer, land').range(0, 9999),
+    // Haal verse referentiedata op — debiteuren gepagineerd want >1000 mogelijk
+    const allDeb: { nummer: string; land: string }[] = []
+    let debFrom = 0
+    while (true) {
+      const { data } = await supabase.from('debiteuren').select('nummer, land').range(debFrom, debFrom + 999)
+      if (!data?.length) break
+      allDeb.push(...data as { nummer: string; land: string }[])
+      if (data.length < 1000) break
+      debFrom += 1000
+    }
+
+    const [{ data: freshArt }, { data: freshCgc }, { data: freshR }, { data: freshLh }, { data: freshLk }] = await Promise.all([
       supabase.from('artikel_codes').select('artikel, code_groep'),
       supabase.from('code_groep_config').select('code_groep, ras_id'),
       supabase.from('rassen').select('id, naam, licentiehouder_id'),
@@ -241,7 +250,7 @@ export default function Omzetrekeningen() {
       supabase.from('licentiekosten').select('code_groep, land, tarief'),
     ])
     const freshDebMap: Record<number, string> = {}
-    for (const d of (freshDeb ?? []) as { nummer: string; land: string }[]) {
+    for (const d of allDeb) {
       const nr = parseInt(d.nummer); if (!isNaN(nr)) freshDebMap[nr] = d.land
     }
     const freshArtMap: Record<number, number> = {}
