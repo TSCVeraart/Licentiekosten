@@ -78,7 +78,7 @@ export default function Omzetrekeningen() {
   useEffect(() => { load() }, [])
 
   const parsePaste = () => {
-    const lines = paste.trim().split('\n').filter(l => l.trim())
+    const lines = paste.trim().split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim())
     if (!lines.length) { toast.error('Geen data geplakt'); return }
     const parsed: RawRow[] = lines.map(line => {
       const c = line.split('\t')
@@ -228,19 +228,9 @@ export default function Omzetrekeningen() {
           <table>
             <thead>
               <tr>
-                <th>Datum</th>
-                <th>Rekening</th>
-                <th>Omschrijving</th>
-                <th className="num">Debet EUR</th>
-                <th className="num">Credit EUR</th>
-                <th className="num">V.V.-bedrag</th>
-                <th>Debiteur</th>
-                <th>Naam</th>
-                <th>Land</th>
-                <th>Soort</th>
-                <th>Artikel</th>
-                <th className="num">Aantal</th>
-                <th></th>
+                {['Datum','Rekening','Omschrijving','Debet EUR','Credit EUR','V.V.-bedrag','Debiteur','Naam','Land','Soort','Artikel','Aantal',''].map(h => (
+                  <th key={h} className={['Debet EUR','Credit EUR','V.V.-bedrag','Aantal'].includes(h) ? 'num' : ''} style={{ position: 'sticky', top: 0, zIndex: 1 }}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
