@@ -33,11 +33,10 @@ export default function Licentiekosten() {
     })
 
   const load = async () => {
-    const [{ data: ak }, { data: cgc }, { data: r }, { data: rl }, { data: lh }, { data: lk }] = await Promise.all([
+    const [{ data: ak }, { data: cgc }, { data: r }, { data: lh }, { data: lk }] = await Promise.all([
       supabase.from('artikel_codes').select('code_groep, omschrijving').not('code_groep', 'is', null),
       supabase.from('code_groep_config').select('*'),
-      supabase.from('rassen').select('*'),
-      supabase.from('ras_landen').select('*'),
+      supabase.from('rassen').select('*, ras_landen(land)'),
       supabase.from('licentiehouders').select('id, naam'),
       supabase.from('licentiekosten').select('code_groep, land, tarief'),
     ])
@@ -59,11 +58,10 @@ export default function Licentiekosten() {
     // Rassen with licentiehouder and landen
     const lhMap: Record<number, string> = {}
     for (const l of (lh ?? []) as Licentiehouder[]) lhMap[l.id] = l.naam
-    const rasLanden = (rl ?? []) as { ras_id: number; land: string }[]
-    setRassen(((r ?? []) as Ras[]).map(ras => ({
+    setRassen(((r ?? []) as any[]).map(ras => ({
       ...ras,
       lh_naam: lhMap[ras.licentiehouder_id] ?? '–',
-      landen: rasLanden.filter(l => l.ras_id === ras.id).map(l => l.land).sort(),
+      landen: (ras.ras_landen ?? []).map((l: any) => l.land).sort(),
     })))
 
     // Tarieven map
