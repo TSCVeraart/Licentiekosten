@@ -23,10 +23,16 @@ interface Omzetrekening {
 
 type RawRow = Omit<Omzetrekening, 'id' | 'created_at'>
 
-const REKENING_SOORT: Record<string, SoortPlant> = {
-  '8301': 'Aardbei',
-  '8304': 'Framboos',
-  '8305': 'Braam',
+const REKENING_SOORT: [string, SoortPlant][] = [
+  ['8301', 'Aardbei'],
+  ['8304', 'Framboos'],
+  ['8305', 'Braam'],
+]
+
+const soortVanRekening = (rekening: string | null): SoortPlant | null => {
+  if (!rekening) return null
+  const match = REKENING_SOORT.find(([nr]) => rekening.includes(nr))
+  return match ? match[1] : null
 }
 
 const parseNum = (s: string) => {
@@ -91,7 +97,7 @@ export default function Omzetrekeningen() {
         artikel_omschrijving: c[8]?.trim() || null,
         artikel: c[9]?.trim() ? parseInt(c[9]) || null : null,
         aantal: c[10]?.trim() ? parseInt(c[10]) || null : null,
-        soort: rekening ? (REKENING_SOORT[rekening] ?? null) : null,
+        soort: soortVanRekening(rekening),
       }
     })
     setPreview(parsed)
