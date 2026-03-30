@@ -187,7 +187,17 @@ export default function Rassen() {
                 </div>
               </div>
               <div className="form-group">
-                <label>Landen</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <label style={{ margin: 0 }}>Landen</label>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12, padding: '2px 8px' }}
+                    onClick={() => setSelectedLanden(selectedLanden.length === LANDEN.length ? [] : [...LANDEN])}
+                  >
+                    {selectedLanden.length === LANDEN.length ? 'Niets selecteren' : 'Alles selecteren'}
+                  </button>
+                </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
                   {LANDEN.map(land => (
                     <div
