@@ -37,8 +37,10 @@ export default function Debiteuren() {
     return (!q || r.naam.toLowerCase().includes(q) || r.nummer.includes(q)) &&
       (!filterLand || r.land === filterLand)
   }).sort((a, b) => {
-    const av = sortCol === 'actief' ? (a.actief ? 1 : 0) : (a[sortCol] ?? '').toString().toLowerCase()
-    const bv = sortCol === 'actief' ? (b.actief ? 1 : 0) : (b[sortCol] ?? '').toString().toLowerCase()
+    let av: string | number, bv: string | number
+    if (sortCol === 'actief') { av = a.actief ? 1 : 0; bv = b.actief ? 1 : 0 }
+    else if (sortCol === 'nummer') { av = parseInt(a.nummer) || 0; bv = parseInt(b.nummer) || 0 }
+    else { av = (a[sortCol] ?? '').toLowerCase(); bv = (b[sortCol] ?? '').toLowerCase() }
     return sortDir === 'asc' ? (av > bv ? 1 : av < bv ? -1 : 0) : (av < bv ? 1 : av > bv ? -1 : 0)
   })
 
