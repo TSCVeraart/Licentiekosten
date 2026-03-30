@@ -165,17 +165,17 @@ export default function Omzetrekeningen() {
         </div>
 
         {preview && (
-          <div style={{ marginTop: 14, overflowX: 'auto', borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+          <div style={{ marginTop: 14, overflowX: 'auto', overflowY: 'auto', maxHeight: 320, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <table style={{ fontSize: 12, width: '100%' }}>
               <thead>
                 <tr>
                   {['Datum','Rekening','Omschrijving','Debet','Credit','V.V.','Deb. nr','Deb. naam','Land','Soort','Artikel omschr.','Artikel','Aantal'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '4px 8px', fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} style={{ textAlign: 'left', padding: '4px 8px', fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--card)', zIndex: 1 }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {preview.slice(0, 10).map((r, i) => (
+                {preview.map((r, i) => (
                   <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
                     <td style={{ padding: '4px 8px', whiteSpace: 'nowrap', fontFamily: "'DM Mono',monospace" }}>{r.datum ?? '–'}</td>
                     <td style={{ padding: '4px 8px' }}>{r.rekening ?? '–'}</td>
@@ -192,9 +192,6 @@ export default function Omzetrekeningen() {
                     <td style={{ padding: '4px 8px', textAlign: 'right' }}>{r.aantal ?? '–'}</td>
                   </tr>
                 ))}
-                {preview.length > 10 && (
-                  <tr><td colSpan={13} style={{ padding: '6px 8px', color: 'var(--muted)', fontStyle: 'italic' }}>… en nog {preview.length - 10} regels</td></tr>
-                )}
               </tbody>
             </table>
           </div>
