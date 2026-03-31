@@ -341,7 +341,8 @@ export default function Omzetrekeningen() {
       const rekening = c[1]?.trim() || null
       const parseIntNL = (s: string) => { const n = parseInt(s.replace(/\./g, ''), 10); return isNaN(n) ? null : n }
       const debiteur_nr = c[6]?.trim() ? parseIntNL(c[6]) : null
-      const artikel = c[9]?.trim() || null
+      const rawArtikel = c[9]?.trim() || null
+      const artikel = rawArtikel && /^\d[\d.]*$/.test(rawArtikel) ? rawArtikel.replace(/\./g, '') : rawArtikel
       const aantal = c[10]?.trim() ? parseIntNL(c[10]) : null
       const land_debiteur = debiteur_nr != null ? (freshDebMap[debiteur_nr] ?? null) : null
       const code_groep = artikel != null ? (freshArtMap[artikel] ?? null) : null
@@ -420,7 +421,8 @@ export default function Omzetrekeningen() {
     // Bereken updates per rij
     const updates = rows.map(r => {
       const land_debiteur = r.debiteur_nr != null ? (debMap[r.debiteur_nr] ?? r.land_debiteur) : r.land_debiteur
-      const code_groep    = r.artikel != null ? (artMap[r.artikel] ?? r.code_groep) : r.code_groep
+      const artikelKey    = r.artikel != null && /^\d[\d.]*$/.test(r.artikel) ? r.artikel.replace(/\./g, '') : r.artikel
+      const code_groep    = artikelKey != null ? (artMap[artikelKey] ?? r.code_groep) : r.code_groep
       const rasInfo       = code_groep != null ? (cgRasMap[code_groep] ?? null) : null
       const licentiekosten = (code_groep != null && land_debiteur != null)
         ? (tkMap[`${code_groep}_${land_debiteur}`] ?? null)
