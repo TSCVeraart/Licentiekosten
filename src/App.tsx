@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
 import { LayoutDashboard, Users, Leaf, Package, BookOpen, TrendingUp, Tag, Euro, AlertCircle } from 'lucide-react'
 import { supabase } from './lib/supabase'
-import { LS_KLEUREN } from './pages/OntbrekendeKosten'
 import Dashboard from './pages/Dashboard'
 import Debiteuren from './pages/Debiteuren'
 import Licentiehouders from './pages/Licentiehouders'
@@ -17,25 +16,19 @@ function useOntbrekendBadge() {
   const [count, setCount] = useState(0)
 
   const refresh = async () => {
-    const { count: total } = await supabase
+    const { count } = await supabase
       .from('omzetrekeningen')
       .select('id', { count: 'exact', head: true })
       .is('totaal_licentiekosten', null)
-    const kleuren: Record<number, string> = JSON.parse(localStorage.getItem(LS_KLEUREN) ?? '{}')
-    const nietToegewezen = Math.max(0, (total ?? 0) - Object.keys(kleuren).length)
-    setCount(nietToegewezen)
+      .is('kleur', null)
+    setCount(count ?? 0)
   }
 
   useEffect(() => {
     refresh()
     const onFocus = () => refresh()
-    const onKleurenChanged = () => refresh()
     window.addEventListener('focus', onFocus)
-    window.addEventListener('ontbrekend-kleuren-changed', onKleurenChanged)
-    return () => {
-      window.removeEventListener('focus', onFocus)
-      window.removeEventListener('ontbrekend-kleuren-changed', onKleurenChanged)
-    }
+    return () => window.removeEventListener('focus', onFocus)
   }, [])
 
   return count

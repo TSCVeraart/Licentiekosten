@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePersistedState } from '../lib/usePersistedState'
 import { Search, Pencil, Check } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { MultiSelect } from '../lib/MultiSelect'
 
@@ -19,6 +20,7 @@ interface OmzetRij {
   licentiehouder_naam: string | null
   intern_extern: string | null
   aantal: number | null
+  kleur: string | null
 }
 
 export const KLEUREN = [
@@ -32,11 +34,7 @@ export const KLEUREN = [
   { id: 'paars',       hex: '#a855f7', defaultLabel: 'Overige reden' },
 ]
 
-export const LS_KLEUREN = 'ontbrekend-kleuren'
 export const LS_LEGENDA  = 'ontbrekend-legenda'
-
-export const loadOntbrekendKleuren = (): Record<number, string> =>
-  JSON.parse(localStorage.getItem(LS_KLEUREN) ?? '{}')
 
 const loadLegenda = (): Record<string, string> =>
   JSON.parse(localStorage.getItem(LS_LEGENDA) ?? '{}')
@@ -52,7 +50,6 @@ export default function OntbrekendeKosten() {
   const [filterDebiteur, setFilterDebiteur] = usePersistedState<string[]>('f-ontb-debiteur', [])
   const [filterRas,      setFilterRas]      = usePersistedState<string[]>('f-ontb-ras', [])
   const [filterLh,       setFilterLh]       = usePersistedState<string[]>('f-ontb-lh', [])
-  const [kleuren, setKleuren]       = useState<Record<number, string>>(loadOntbrekendKleuren)
   const [legenda, setLegenda]       = useState<Record<string, string>>(loadLegenda)
   const [editLabel, setEditLabel]   = useState<string | null>(null)
   const [editVal, setEditVal]       = useState('')
@@ -75,7 +72,7 @@ export default function OntbrekendeKosten() {
       while (true) {
         const { data } = await supabase
           .from('omzetrekeningen')
-          .select('id,datum,rekening,omschrijving,debiteur_nr,debiteur_naam,land_debiteur,soort,artikel,code_groep,ras_naam,licentiehouder_naam,intern_extern,aantal')
+          .select('id,datum,rekening,omschrijving,debiteur_nr,debiteur_naam,land_debiteur,soort,artikel,code_groep,ras_naam,licentiehouder_naam,intern_extern,aantal,kleur')
           .is('totaal_licentiekosten', null)
           .order('datum', { ascending: false })
           .range(from, from + pageSize - 1)
@@ -100,32 +97,22 @@ export default function OntbrekendeKosten() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const notifyKleurenChanged = () => window.dispatchEvent(new Event('ontbrekend-kleuren-changed'))
+  const kleuren: Record<number, string> = {}
+  for (const r of rows) if (r.kleur) kleuren[r.id] = r.kleur
 
-  const setKleur = (id: number, kleurId: string | null) => {
-    setKleuren(prev => {
-      const next = { ...prev }
-      if (kleurId === null) delete next[id]
-      else next[id] = kleurId
-      localStorage.setItem(LS_KLEUREN, JSON.stringify(next))
-      return next
-    })
+  const setKleur = async (id: number, kleurId: string | null) => {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, kleur: kleurId } : r))
     setPopover(null)
-    notifyKleurenChanged()
+    const { error } = await supabase.from('omzetrekeningen').update({ kleur: kleurId }).eq('id', id)
+    if (error) toast.error('Fout bij opslaan kleur')
   }
 
-  const setBulkKleur = (kleurId: string | null) => {
-    setKleuren(prev => {
-      const next = { ...prev }
-      for (const id of selected) {
-        if (kleurId === null) delete next[id]
-        else next[id] = kleurId
-      }
-      localStorage.setItem(LS_KLEUREN, JSON.stringify(next))
-      return next
-    })
+  const setBulkKleur = async (kleurId: string | null) => {
+    const ids = [...selected]
+    setRows(prev => prev.map(r => ids.includes(r.id) ? { ...r, kleur: kleurId } : r))
     setSelected(new Set())
-    notifyKleurenChanged()
+    const { error } = await supabase.from('omzetrekeningen').update({ kleur: kleurId }).in('id', ids)
+    if (error) toast.error('Fout bij opslaan kleuren')
   }
 
   const saveLabel = (kleurId: string) => {

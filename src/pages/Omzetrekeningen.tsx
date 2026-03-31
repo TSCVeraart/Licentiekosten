@@ -3,7 +3,7 @@ import { Upload, Trash2, Search, RefreshCw } from 'lucide-react'
 import { MultiSelect } from '../lib/MultiSelect'
 import toast from 'react-hot-toast'
 import { supabase, type SoortPlant } from '../lib/supabase'
-import { loadOntbrekendKleuren, getKleurHex } from './OntbrekendeKosten'
+import { getKleurHex } from './OntbrekendeKosten'
 import { usePersistedState } from '../lib/usePersistedState'
 
 interface Omzetrekening {
@@ -27,6 +27,7 @@ interface Omzetrekening {
   licentiekosten: number | null
   totaal_licentiekosten: number | null
   intern_extern: string | null
+  kleur: string | null
   created_at: string
 }
 
@@ -126,7 +127,6 @@ export default function Omzetrekeningen() {
   const [filterDatumTot, setFilterDatumTot] = usePersistedState('f-omzet-datumtot', '')
   const [sortCol,        setSortCol]        = usePersistedState<string | null>('f-omzet-sortcol', null)
   const [sortDir,        setSortDir]        = usePersistedState<'asc' | 'desc'>('f-omzet-sortdir', 'asc')
-  const [rijKleuren, setRijKleuren] = useState<Record<number, string>>(loadOntbrekendKleuren)
   const [colWidths, setColWidths] = useState<Record<string, number>>(
     () => JSON.parse(localStorage.getItem('omzet-col-widths') ?? 'null') ?? {}
   )
@@ -290,11 +290,6 @@ export default function Omzetrekeningen() {
   }
   useEffect(() => { load() }, [])
 
-  useEffect(() => {
-    const onFocus = () => setRijKleuren(loadOntbrekendKleuren())
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [])
 
   const parsePaste = async () => {
     const lines = paste.trim().split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim())
@@ -433,6 +428,7 @@ export default function Omzetrekeningen() {
         licentiekosten,
         totaal_licentiekosten,
         intern_extern: internExtern(r.debiteur_nr, rasInfo?.lh_naam ?? null),
+        kleur: totaal_licentiekosten != null ? null : r.kleur,
       }
     })
 
@@ -667,7 +663,7 @@ export default function Omzetrekeningen() {
               {loading && <tr><td colSpan={orderedCols.length + 1} className="empty">Laden…</td></tr>}
               {!loading && filtered.length === 0 && <tr><td colSpan={orderedCols.length + 1} className="empty">Geen regels gevonden</td></tr>}
               {filtered.map(r => {
-                const kleurId = rijKleuren[r.id]
+                const kleurId = r.kleur
                 const hex = kleurId ? getKleurHex(kleurId) : null
                 return (
                   <tr
