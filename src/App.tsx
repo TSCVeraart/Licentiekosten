@@ -12,6 +12,28 @@ import Artikelen from './pages/Artikelen'
 import LicentiekostenPage from './pages/Licentiekosten'
 import OntbrekendeKosten from './pages/OntbrekendeKosten'
 
+function useDebiteurenBadge() {
+  const [count, setCount] = useState(0)
+
+  const refresh = async () => {
+    const { count } = await supabase
+      .from('omzetrekeningen')
+      .select('debiteur_nr', { count: 'exact', head: true })
+      .is('land_debiteur', null)
+      .not('debiteur_nr', 'is', null)
+    setCount(count ?? 0)
+  }
+
+  useEffect(() => {
+    refresh()
+    const onFocus = () => refresh()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
+
+  return count
+}
+
 function useOntbrekendBadge() {
   const [count, setCount] = useState(0)
 
@@ -36,6 +58,7 @@ function useOntbrekendBadge() {
 
 export default function App() {
   const ontbrekendCount = useOntbrekendBadge()
+  const debiteurenCount = useDebiteurenBadge()
 
   return (
     <div className="layout">
@@ -45,7 +68,26 @@ export default function App() {
           <div className="nav-section">Overzicht</div>
           <NavLink to="/" end className={({isActive}) => `nav-link ${isActive?'active':''}`}><LayoutDashboard />Dashboard</NavLink>
           <div className="nav-section">Stamgegevens</div>
-          <NavLink to="/debiteuren" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Users />Debiteuren</NavLink>
+          <NavLink to="/debiteuren" className={({isActive}) => `nav-link ${isActive?'active':''}`}>
+            <Users />
+            Debiteuren
+            {debiteurenCount > 0 && (
+              <span style={{
+                marginLeft: 'auto',
+                minWidth: 20, height: 20,
+                borderRadius: 10,
+                background: 'var(--danger)',
+                color: '#fff',
+                fontSize: 11,
+                fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '0 5px',
+                lineHeight: 1,
+              }}>
+                {debiteurenCount > 99 ? '99+' : debiteurenCount}
+              </span>
+            )}
+          </NavLink>
           <NavLink to="/licentiehouders" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Leaf />Licentiehouders</NavLink>
           <NavLink to="/rassen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Package />Rassen</NavLink>
           <div className="nav-section">Boekingen</div>
