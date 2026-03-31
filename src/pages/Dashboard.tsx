@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { MultiSelect } from '../lib/MultiSelect'
+import { usePersistedState } from '../lib/usePersistedState'
 
 interface OmzetRow {
   datum: string | null
@@ -21,14 +22,14 @@ type GroupBy = 'maand' | 'licentiehouder' | 'ras' | 'soort' | 'land' | 'type'
 export default function Dashboard() {
   const [rows, setRows] = useState<OmzetRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [filterDatumVan, setFilterDatumVan] = useState('')
-  const [filterDatumTot, setFilterDatumTot] = useState('')
-  const [filterLh, setFilterLh] = useState<string[]>([])
-  const [filterSoort, setFilterSoort] = useState<string[]>([])
-  const [filterRas, setFilterRas] = useState<string[]>([])
-  const [filterLand, setFilterLand] = useState<string[]>([])
-  const [filterType, setFilterType] = useState<string[]>([])
-  const [groupBy, setGroupBy] = useState<GroupBy>('maand')
+  const [filterDatumVan, setFilterDatumVan] = usePersistedState('f-dash-datumvan', '')
+  const [filterDatumTot, setFilterDatumTot] = usePersistedState('f-dash-datumtot', '')
+  const [filterLh,       setFilterLh]       = usePersistedState<string[]>('f-dash-lh', [])
+  const [filterSoort,    setFilterSoort]    = usePersistedState<string[]>('f-dash-soort', [])
+  const [filterRas,      setFilterRas]      = usePersistedState<string[]>('f-dash-ras', [])
+  const [filterLand,     setFilterLand]     = usePersistedState<string[]>('f-dash-land', [])
+  const [filterType,     setFilterType]     = usePersistedState<string[]>('f-dash-type', [])
+  const [groupBy,        setGroupBy]        = usePersistedState<GroupBy>('f-dash-groupby', 'maand')
 
   useEffect(() => {
     const fetch = async () => {

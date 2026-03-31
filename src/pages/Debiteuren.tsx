@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { usePersistedState } from '../lib/usePersistedState'
 import { Plus, Search, Pencil, Trash2, X, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Debiteur, type DebiteurType } from '../lib/supabase'
@@ -9,8 +10,8 @@ const EMPTY: Omit<Debiteur,'id'|'created_at'|'updated_at'> = { nummer:'', naam:'
 export default function Debiteuren() {
   const [rows, setRows] = useState<Debiteur[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [filterLand, setFilterLand] = useState('')
+  const [search,      setSearch]      = usePersistedState('f-deb-search', '')
+  const [filterLand,  setFilterLand]  = usePersistedState('f-deb-land', '')
   const [modal, setModal] = useState<'add'|'edit'|'import'|null>(null)
   const [form, setForm] = useState(EMPTY)
   const [editId, setEditId] = useState<number|null>(null)
@@ -18,8 +19,8 @@ export default function Debiteuren() {
   const [importRows, setImportRows] = useState<{nummer:string,naam:string,land:string}[]>([])
   const [importing, setImporting] = useState(false)
   const [paste, setPaste] = useState('')
-  const [sortCol, setSortCol] = useState<'nummer'|'naam'|'land'|'actief'>('naam')
-  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc')
+  const [sortCol, setSortCol] = usePersistedState<'nummer'|'naam'|'land'|'actief'>('f-deb-sortcol', 'naam')
+  const [sortDir, setSortDir] = usePersistedState<'asc'|'desc'>('f-deb-sortdir', 'asc')
 
   const handleSort = (col: typeof sortCol) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')

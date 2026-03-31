@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { usePersistedState } from '../lib/usePersistedState'
 import { Check, ChevronDown, ChevronRight, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Ras, type Licentiehouder } from '../lib/supabase'
@@ -15,15 +16,15 @@ export default function Licentiekosten() {
   const [collapsed, setCollapsed] = useState<Set<number>>(() => {
     try { const s = localStorage.getItem('lk_collapsed'); return s ? new Set(JSON.parse(s)) : new Set() } catch { return new Set() }
   })
-  const [search, setSearch] = useState('')
+  const [search,             setSearch]             = usePersistedState('f-lk-search', '')
+  const [filterNietIngevuld, setFilterNietIngevuld] = usePersistedState('f-lk-niet-ingevuld', false)
+  const [filterRas,          setFilterRas]          = usePersistedState('f-lk-ras', '')
+  const [filterLh,           setFilterLh]           = usePersistedState('f-lk-lh', '')
+  const [filterSoort,        setFilterSoort]        = usePersistedState('f-lk-soort', '')
   const [bulkVal, setBulkVal] = useState<Record<number, string>>({})
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
   const savingRef = useRef(false)
-  const [filterNietIngevuld, setFilterNietIngevuld] = useState(false)
-  const [filterRas, setFilterRas] = useState('')
-  const [filterLh, setFilterLh] = useState('')
-  const [filterSoort, setFilterSoort] = useState('')
 
   const toggleCollapse = (code_groep: number) =>
     setCollapsed(prev => {

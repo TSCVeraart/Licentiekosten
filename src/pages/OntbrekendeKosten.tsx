@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { usePersistedState } from '../lib/usePersistedState'
 import { Search, Pencil, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { MultiSelect } from '../lib/MultiSelect'
@@ -45,16 +46,16 @@ export const getKleurHex = (kleurId: string) =>
 export default function OntbrekendeKosten() {
   const [rows, setRows]             = useState<OmzetRij[]>([])
   const [loading, setLoading]       = useState(true)
-  const [search, setSearch]         = useState('')
+  const [search,         setSearch]         = usePersistedState('f-ontb-search', '')
+  const [filterKleur,    setFilterKleur]    = usePersistedState('f-ontb-kleur', 'alle')
+  const [filterDebiteur, setFilterDebiteur] = usePersistedState<string[]>('f-ontb-debiteur', [])
+  const [filterRas,      setFilterRas]      = usePersistedState<string[]>('f-ontb-ras', [])
+  const [filterLh,       setFilterLh]       = usePersistedState<string[]>('f-ontb-lh', [])
   const [kleuren, setKleuren]       = useState<Record<number, string>>(loadOntbrekendKleuren)
   const [legenda, setLegenda]       = useState<Record<string, string>>(loadLegenda)
   const [editLabel, setEditLabel]   = useState<string | null>(null)
   const [editVal, setEditVal]       = useState('')
   const [popover, setPopover]       = useState<number | null>(null)
-  const [filterKleur, setFilterKleur]         = useState<string>('alle')
-  const [filterDebiteur, setFilterDebiteur]   = useState<string[]>([])
-  const [filterRas, setFilterRas]             = useState<string[]>([])
-  const [filterLh, setFilterLh]               = useState<string[]>([])
   const [selected, setSelected]               = useState<Set<number>>(new Set())
   const popoverRef                  = useRef<HTMLDivElement>(null)
 

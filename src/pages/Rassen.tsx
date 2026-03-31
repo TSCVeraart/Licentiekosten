@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { usePersistedState } from '../lib/usePersistedState'
 import { Plus, Pencil, Trash2, X, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Ras, type Licentiehouder, type SoortPlant } from '../lib/supabase'
@@ -11,9 +12,9 @@ export default function Rassen() {
   const [rassen, setRassen] = useState<(Ras & { licentiehouder_naam?: string; landen?: string[] })[]>([])
   const [lhList, setLhList] = useState<Licentiehouder[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [filterLh, setFilterLh] = useState('')
-  const [filterSoort, setFilterSoort] = useState('')
+  const [search,      setSearch]      = usePersistedState('f-ras-search', '')
+  const [filterLh,    setFilterLh]    = usePersistedState('f-ras-lh', '')
+  const [filterSoort, setFilterSoort] = usePersistedState('f-ras-soort', '')
   const [modal, setModal] = useState<'add' | 'edit' | null>(null)
   const [form, setForm] = useState(EMPTY_RAS)
   const [selectedLanden, setSelectedLanden] = useState<string[]>([])
@@ -21,8 +22,8 @@ export default function Rassen() {
   const [nieuwLand, setNieuwLand] = useState('')
   const [editId, setEditId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
-  const [sortCol, setSortCol] = useState<'naam' | 'licentiehouder_naam' | 'soort' | 'landen' | 'actief'>('naam')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [sortCol, setSortCol] = usePersistedState<'naam' | 'licentiehouder_naam' | 'soort' | 'landen' | 'actief'>('f-ras-sortcol', 'naam')
+  const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('f-ras-sortdir', 'asc')
 
   const handleSort = (col: typeof sortCol) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')

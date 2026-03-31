@@ -4,6 +4,7 @@ import { MultiSelect } from '../lib/MultiSelect'
 import toast from 'react-hot-toast'
 import { supabase, type SoortPlant } from '../lib/supabase'
 import { loadOntbrekendKleuren, getKleurHex } from './OntbrekendeKosten'
+import { usePersistedState } from '../lib/usePersistedState'
 
 interface Omzetrekening {
   id: number
@@ -110,21 +111,21 @@ export default function Omzetrekeningen() {
   const [importing, setImporting] = useState(false)
   const [herberekening, setHerberekening] = useState(false)
   const [herberekeningVoortgang, setHerberekeningVoortgang] = useState<{gedaan: number; totaal: number} | null>(null)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = usePersistedState('f-omzet-search', '')
   const [colOrder, setColOrder] = useState<string[]>(
     () => JSON.parse(localStorage.getItem('omzet-col-order') ?? 'null') ?? COL_KEYS
   )
   const [dragKey, setDragKey] = useState<string | null>(null)
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
-  const [filterSoort, setFilterSoort] = useState<string[]>([])
-  const [filterLand, setFilterLand] = useState<string[]>([])
-  const [filterRas, setFilterRas] = useState<string[]>([])
-  const [filterLh, setFilterLh] = useState<string[]>([])
-  const [filterType, setFilterType] = useState<string[]>([])
-  const [filterDatumVan, setFilterDatumVan] = useState('')
-  const [filterDatumTot, setFilterDatumTot] = useState('')
-  const [sortCol, setSortCol] = useState<string | null>(null)
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [filterSoort,    setFilterSoort]    = usePersistedState<string[]>('f-omzet-soort', [])
+  const [filterLand,     setFilterLand]     = usePersistedState<string[]>('f-omzet-land', [])
+  const [filterRas,      setFilterRas]      = usePersistedState<string[]>('f-omzet-ras', [])
+  const [filterLh,       setFilterLh]       = usePersistedState<string[]>('f-omzet-lh', [])
+  const [filterType,     setFilterType]     = usePersistedState<string[]>('f-omzet-type', [])
+  const [filterDatumVan, setFilterDatumVan] = usePersistedState('f-omzet-datumvan', '')
+  const [filterDatumTot, setFilterDatumTot] = usePersistedState('f-omzet-datumtot', '')
+  const [sortCol,        setSortCol]        = usePersistedState<string | null>('f-omzet-sortcol', null)
+  const [sortDir,        setSortDir]        = usePersistedState<'asc' | 'desc'>('f-omzet-sortdir', 'asc')
   const [rijKleuren, setRijKleuren] = useState<Record<number, string>>(loadOntbrekendKleuren)
   const [colWidths, setColWidths] = useState<Record<string, number>>(
     () => JSON.parse(localStorage.getItem('omzet-col-widths') ?? 'null') ?? {}

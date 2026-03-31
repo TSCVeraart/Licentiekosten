@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { usePersistedState } from '../lib/usePersistedState'
 import { Plus, Trash2, X, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Grootboek1955, type Licentiehouder, type GrbType } from '../lib/supabase'
@@ -21,10 +22,10 @@ export default function Grootboek() {
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
-  const [filterMaand, setFilterMaand] = useState('')
-  const [filterLh, setFilterLh] = useState('')
-  const [filterType, setFilterType] = useState('')
-  const [search, setSearch] = useState('')
+  const [filterMaand, setFilterMaand] = usePersistedState('f-grb-maand', '')
+  const [filterLh,    setFilterLh]    = usePersistedState('f-grb-lh', '')
+  const [filterType,  setFilterType]  = usePersistedState('f-grb-type', '')
+  const [search,      setSearch]      = usePersistedState('f-grb-search', '')
 
   const load = async () => {
     const [{ data:g },{ data:lh }] = await Promise.all([
