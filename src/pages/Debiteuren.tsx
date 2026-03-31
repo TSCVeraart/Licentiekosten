@@ -21,6 +21,7 @@ export default function Debiteuren() {
   const [paste, setPaste] = useState('')
   const [sortCol, setSortCol] = usePersistedState<'nummer'|'naam'|'land'|'actief'>('f-deb-sortcol', 'naam')
   const [sortDir, setSortDir] = usePersistedState<'asc'|'desc'>('f-deb-sortdir', 'asc')
+  const [ontbrekend, setOntbrekend] = useState<{debiteur_nr: number; debiteur_naam: string}[]>([])
 
   const handleSort = (col: typeof sortCol) => {
     if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -42,6 +43,22 @@ export default function Debiteuren() {
   }
   useEffect(() => { load() }, [])
 
+  const loadOntbrekend = async () => {
+    const { data } = await supabase
+      .from('omzetrekeningen')
+      .select('debiteur_nr, debiteur_naam')
+      .is('land_debiteur', null)
+      .not('debiteur_nr', 'is', null)
+    if (!data?.length) { setOntbrekend([]); return }
+    const uniek = [...new Map(
+      (data as {debiteur_nr: number; debiteur_naam: string}[])
+        .filter(r => r.debiteur_nr != null)
+        .map(r => [r.debiteur_nr, r])
+    ).values()]
+    setOntbrekend(uniek)
+  }
+  useEffect(() => { loadOntbrekend() }, [])
+
   const filtered = rows.filter(r => {
     const q = search.toLowerCase()
     return (!q || r.naam.toLowerCase().includes(q) || r.nummer.includes(q)) &&
@@ -61,7 +78,7 @@ export default function Debiteuren() {
     const { error } = await op
     if (error) { toast.error(error.message); setSaving(false); return }
     toast.success(modal === 'add' ? 'Debiteur toegevoegd' : 'Opgeslagen')
-    setSaving(false); setModal(null); load()
+    setSaving(false); setModal(null); load(); loadOntbrekend()
   }
 
   const remove = async (id: number, naam: string) => {
@@ -127,6 +144,33 @@ export default function Debiteuren() {
           </button>
         </div>
       </div>
+
+      {ontbrekend.length > 0 && (
+        <div className="card" style={{ marginBottom: 16, padding: 16, borderLeft: '4px solid var(--danger)' }}>
+          <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 10, color: 'var(--danger)' }}>
+            {ontbrekend.length} debiteur{ontbrekend.length !== 1 ? 'en' : ''} zonder land in omzetrekeningen
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {ontbrekend.map(r => (
+              <div key={r.debiteur_nr} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13 }}>
+                <span className="mono text-muted" style={{ fontSize: 12, minWidth: 60 }}>{r.debiteur_nr}</span>
+                <span style={{ flex: 1 }}>{r.debiteur_naam ?? '–'}</span>
+                <button
+                  className="btn btn-secondary"
+                  style={{ fontSize: 12, padding: '3px 10px' }}
+                  onClick={() => {
+                    setForm({ ...EMPTY, nummer: String(r.debiteur_nr), naam: r.debiteur_naam ?? '' })
+                    setEditId(null)
+                    setModal('add')
+                  }}
+                >
+                  Toevoegen
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 16, padding: 16 }}>
         <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 6 }}>Excel data plakken</div>
