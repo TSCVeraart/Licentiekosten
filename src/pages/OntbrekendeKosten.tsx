@@ -1,0 +1,312 @@
+import { useEffect, useRef, useState } from 'react'
+import { Search, Pencil, Check } from 'lucide-react'
+import { supabase } from '../lib/supabase'
+
+interface OmzetRij {
+  id: number
+  datum: string | null
+  rekening: string | null
+  omschrijving: string | null
+  debiteur_nr: number | null
+  debiteur_naam: string | null
+  land_debiteur: string | null
+  soort: string | null
+  artikel: number | null
+  code_groep: number | null
+  ras_naam: string | null
+  licentiehouder_naam: string | null
+  intern_extern: string | null
+  aantal: number | null
+}
+
+const KLEUREN = [
+  { id: 'rood',   hex: '#ef4444', defaultLabel: 'Brondata aanpassen' },
+  { id: 'oranje', hex: '#f97316', defaultLabel: 'Geen tarief geconfigureerd' },
+  { id: 'geel',   hex: '#eab308', defaultLabel: 'Geen ras gekoppeld' },
+  { id: 'groen',  hex: '#22c55e', defaultLabel: 'Intern / geen kosten verwacht' },
+  { id: 'blauw',  hex: '#3b82f6', defaultLabel: 'Wordt nagekeken' },
+  { id: 'paars',  hex: '#a855f7', defaultLabel: 'Overige reden' },
+]
+
+const LS_KLEUREN  = 'ontbrekend-kleuren'
+const LS_LEGENDA  = 'ontbrekend-legenda'
+
+const loadKleuren  = (): Record<number, string> => JSON.parse(localStorage.getItem(LS_KLEUREN) ?? '{}')
+const loadLegenda  = (): Record<string, string> => JSON.parse(localStorage.getItem(LS_LEGENDA) ?? '{}')
+
+export default function OntbrekendeKosten() {
+  const [rows, setRows]         = useState<OmzetRij[]>([])
+  const [loading, setLoading]   = useState(true)
+  const [search, setSearch]     = useState('')
+  const [kleuren, setKleuren]   = useState<Record<number, string>>(loadKleuren)
+  const [legenda, setLegenda]   = useState<Record<string, string>>(loadLegenda)
+  const [editLabel, setEditLabel] = useState<string | null>(null)
+  const [editVal, setEditVal]   = useState('')
+  const [popover, setPopover]   = useState<number | null>(null)
+  const popoverRef              = useRef<HTMLDivElement>(null)
+  const [filterKleur, setFilterKleur] = useState<string>('alle')
+
+  useEffect(() => {
+    const fetchAll = async () => {
+      const pageSize = 1000
+      let all: OmzetRij[] = []
+      let from = 0
+      while (true) {
+        const { data } = await supabase
+          .from('omzetrekeningen')
+          .select('id,datum,rekening,omschrijving,debiteur_nr,debiteur_naam,land_debiteur,soort,artikel,code_groep,ras_naam,licentiehouder_naam,intern_extern,aantal')
+          .is('totaal_licentiekosten', null)
+          .order('datum', { ascending: false })
+          .range(from, from + pageSize - 1)
+        if (!data?.length) break
+        all = [...all, ...data as OmzetRij[]]
+        if (data.length < pageSize) break
+        from += pageSize
+      }
+      setRows(all)
+      setLoading(false)
+    }
+    fetchAll()
+  }, [])
+
+  // Sluit popover bij klik buiten
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setPopover(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const setKleur = (id: number, kleurId: string | null) => {
+    setKleuren(prev => {
+      const next = { ...prev }
+      if (kleurId === null) delete next[id]
+      else next[id] = kleurId
+      localStorage.setItem(LS_KLEUREN, JSON.stringify(next))
+      return next
+    })
+    setPopover(null)
+  }
+
+  const saveLabel = (kleurId: string) => {
+    setLegenda(prev => {
+      const next = { ...prev, [kleurId]: editVal }
+      localStorage.setItem(LS_LEGENDA, JSON.stringify(next))
+      return next
+    })
+    setEditLabel(null)
+  }
+
+  const getLabel = (kleurId: string) =>
+    legenda[kleurId] ?? KLEUREN.find(k => k.id === kleurId)?.defaultLabel ?? kleurId
+
+  const getHex = (kleurId: string) => KLEUREN.find(k => k.id === kleurId)?.hex ?? '#94a3b8'
+
+  const filtered = rows.filter(r => {
+    const q = search.toLowerCase()
+    const matchQ = !q ||
+      (r.debiteur_naam ?? '').toLowerCase().includes(q) ||
+      (r.omschrijving ?? '').toLowerCase().includes(q) ||
+      (r.ras_naam ?? '').toLowerCase().includes(q) ||
+      (r.licentiehouder_naam ?? '').toLowerCase().includes(q) ||
+      String(r.debiteur_nr ?? '').includes(q) ||
+      (r.land_debiteur ?? '').toLowerCase().includes(q)
+    const matchKleur = filterKleur === 'alle'
+      ? true
+      : filterKleur === 'geen'
+        ? !kleuren[r.id]
+        : kleuren[r.id] === filterKleur
+    return matchQ && matchKleur
+  })
+
+  const aantalPerKleur = (kleurId: string) => rows.filter(r => kleuren[r.id] === kleurId).length
+  const aantalZonderKleur = rows.filter(r => !kleuren[r.id]).length
+
+  return (
+    <>
+      <div className="page-header">
+        <div>
+          <div className="page-title">Ontbrekende licentiekosten</div>
+          <div className="page-sub">{rows.length} regels zonder licentiekosten</div>
+        </div>
+      </div>
+
+      {/* Legenda */}
+      <div className="card" style={{ marginBottom: 16, padding: 16 }}>
+        <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 10 }}>
+          Kleurlegenda <span style={{ fontWeight: 400, color: 'var(--muted)', fontSize: 12 }}>— klik op een label om te bewerken</span>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {KLEUREN.map(k => (
+            <div
+              key={k.id}
+              onClick={() => setFilterKleur(prev => prev === k.id ? 'alle' : k.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '5px 10px', borderRadius: 'var(--radius)',
+                border: `2px solid ${filterKleur === k.id ? k.hex : 'transparent'}`,
+                background: filterKleur === k.id ? k.hex + '18' : 'var(--bg)',
+                cursor: 'pointer', userSelect: 'none',
+              }}
+            >
+              <span style={{ width: 14, height: 14, borderRadius: '50%', background: k.hex, flexShrink: 0 }} />
+              {editLabel === k.id ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
+                  <input
+                    autoFocus
+                    value={editVal}
+                    onChange={e => setEditVal(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveLabel(k.id); if (e.key === 'Escape') setEditLabel(null) }}
+                    style={{ fontSize: 12, padding: '2px 6px', border: '1px solid var(--border-md)', borderRadius: 4, width: 180, background: 'var(--surface)', color: 'var(--text)' }}
+                  />
+                  <button className="btn btn-ghost" style={{ padding: '2px 4px' }} onClick={() => saveLabel(k.id)}><Check size={13} /></button>
+                </span>
+              ) : (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text)' }}>{getLabel(k.id)}</span>
+                  <span
+                    style={{ color: 'var(--muted)', opacity: 0.6, cursor: 'text' }}
+                    onClick={e => { e.stopPropagation(); setEditLabel(k.id); setEditVal(getLabel(k.id)) }}
+                  >
+                    <Pencil size={11} />
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 2 }}>({aantalPerKleur(k.id)})</span>
+                </span>
+              )}
+            </div>
+          ))}
+          <div
+            onClick={() => setFilterKleur(prev => prev === 'geen' ? 'alle' : 'geen')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '5px 10px', borderRadius: 'var(--radius)',
+              border: `2px solid ${filterKleur === 'geen' ? 'var(--border-md)' : 'transparent'}`,
+              background: filterKleur === 'geen' ? 'var(--bg)' : 'var(--bg)',
+              cursor: 'pointer', userSelect: 'none',
+            }}
+          >
+            <span style={{ width: 14, height: 14, borderRadius: '50%', border: '2px dashed var(--muted)', flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>Nog niet beoordeeld ({aantalZonderKleur})</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="filters">
+        <div className="search-wrap" style={{ flex: 1, maxWidth: 280 }}>
+          <Search className="search-icon" />
+          <input placeholder="Zoek debiteur, ras, land…" value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        {filterKleur !== 'alle' && (
+          <button className="btn btn-ghost" onClick={() => setFilterKleur('alle')}>Wis filter</button>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="table-wrap" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 380px)' }}>
+          <table>
+            <thead>
+              <tr>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1, width: 52 }}>Kleur</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Datum</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Deb. nr</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Naam</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Land</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Type</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Soort</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Rekening</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Artikel</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Code groep</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Ras</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Licentiehouder</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1 }} className="num">Aantal</th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1, maxWidth: 200 }}>Omschrijving</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && <tr><td colSpan={14} className="empty">Laden…</td></tr>}
+              {!loading && filtered.length === 0 && <tr><td colSpan={14} className="empty">Geen regels gevonden</td></tr>}
+              {filtered.map(r => {
+                const kleurId = kleuren[r.id] ?? null
+                const hex = kleurId ? getHex(kleurId) : null
+                return (
+                  <tr
+                    key={r.id}
+                    style={{ borderLeft: `4px solid ${hex ?? 'transparent'}`, background: hex ? hex + '10' : undefined }}
+                  >
+                    {/* Kleurknop */}
+                    <td style={{ position: 'relative', textAlign: 'center' }}>
+                      <button
+                        onClick={() => setPopover(prev => prev === r.id ? null : r.id)}
+                        style={{
+                          width: 22, height: 22, borderRadius: '50%',
+                          background: hex ?? 'transparent',
+                          border: hex ? `2px solid ${hex}` : '2px dashed var(--muted)',
+                          cursor: 'pointer', flexShrink: 0,
+                          display: 'inline-block', verticalAlign: 'middle',
+                        }}
+                        title="Kleur instellen"
+                      />
+                      {popover === r.id && (
+                        <div
+                          ref={popoverRef}
+                          style={{
+                            position: 'absolute', top: '100%', left: 0, zIndex: 50,
+                            background: 'var(--surface)', border: '1px solid var(--border-md)',
+                            borderRadius: 'var(--radius)', padding: 10, boxShadow: '0 4px 16px rgba(0,0,0,.15)',
+                            display: 'flex', flexDirection: 'column', gap: 6, minWidth: 220,
+                          }}
+                        >
+                          {KLEUREN.map(k => (
+                            <button
+                              key={k.id}
+                              onClick={() => setKleur(r.id, kleurId === k.id ? null : k.id)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                background: kleurId === k.id ? k.hex + '20' : 'transparent',
+                                border: `1px solid ${kleurId === k.id ? k.hex : 'transparent'}`,
+                                borderRadius: 6, padding: '5px 8px', cursor: 'pointer',
+                                textAlign: 'left', width: '100%',
+                              }}
+                            >
+                              <span style={{ width: 14, height: 14, borderRadius: '50%', background: k.hex, flexShrink: 0 }} />
+                              <span style={{ fontSize: 12, color: 'var(--text)' }}>{getLabel(k.id)}</span>
+                              {kleurId === k.id && <Check size={12} style={{ marginLeft: 'auto', color: k.hex }} />}
+                            </button>
+                          ))}
+                          {kleurId && (
+                            <button
+                              onClick={() => setKleur(r.id, null)}
+                              style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '2px 8px' }}
+                            >
+                              Kleur verwijderen
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="mono" style={{ whiteSpace: 'nowrap', fontSize: 12 }}>{r.datum ?? '–'}</td>
+                    <td className="mono text-muted" style={{ fontSize: 12 }}>{r.debiteur_nr ?? '–'}</td>
+                    <td>{r.debiteur_naam ?? '–'}</td>
+                    <td>{r.land_debiteur ?? <span className="text-muted">–</span>}</td>
+                    <td>{r.intern_extern ?? <span className="text-muted">–</span>}</td>
+                    <td>{r.soort ? <span className={`badge badge-${r.soort.toLowerCase()}`}>{r.soort}</span> : <span className="text-muted">–</span>}</td>
+                    <td className="mono text-muted" style={{ fontSize: 12 }}>{r.rekening ?? '–'}</td>
+                    <td className="mono text-muted" style={{ fontSize: 12 }}>{r.artikel ?? '–'}</td>
+                    <td className="mono text-muted" style={{ fontSize: 12 }}>{r.code_groep ?? '–'}</td>
+                    <td>{r.ras_naam ?? <span className="text-muted">–</span>}</td>
+                    <td style={{ fontSize: 12, color: 'var(--muted)' }}>{r.licentiehouder_naam ?? '–'}</td>
+                    <td className="num">{r.aantal?.toLocaleString('nl-NL') ?? '–'}</td>
+                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--muted)' }}>{r.omschrijving ?? '–'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
+}

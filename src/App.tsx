@@ -1,5 +1,5 @@
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, Leaf, Package, BookOpen, TrendingUp, Tag, Euro } from 'lucide-react'
+import { LayoutDashboard, Users, Leaf, Package, BookOpen, TrendingUp, Tag, Euro, AlertCircle } from 'lucide-react'
 import Dashboard from './pages/Dashboard'
 import Debiteuren from './pages/Debiteuren'
 import Licentiehouders from './pages/Licentiehouders'
@@ -8,6 +8,7 @@ import Grootboek from './pages/Grootboek'
 import Omzetrekeningen from './pages/Omzetrekeningen'
 import Artikelen from './pages/Artikelen'
 import LicentiekostenPage from './pages/Licentiekosten'
+import OntbrekendeKosten from './pages/OntbrekendeKosten'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <div className="nav-section">Boekingen</div>
 <NavLink to="/grootboek" className={({isActive}) => `nav-link ${isActive?'active':''}`}><BookOpen />Grootboek 1955</NavLink>
           <NavLink to="/omzetrekeningen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><TrendingUp />Omzetrekeningen</NavLink>
+          <NavLink to="/ontbrekende-kosten" className={({isActive}) => `nav-link ${isActive?'active':''}`}><AlertCircle />Ontbrekende kosten</NavLink>
           <NavLink to="/artikelen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Tag />Artikelen</NavLink>
           <NavLink to="/licentiekosten" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Euro />Licentiekosten</NavLink>
         </nav>
@@ -37,6 +39,7 @@ export default function App() {
             <Route path="/rassen" element={<Rassen />} />
 <Route path="/grootboek" element={<Grootboek />} />
             <Route path="/omzetrekeningen" element={<Omzetrekeningen />} />
+            <Route path="/ontbrekende-kosten" element={<OntbrekendeKosten />} />
             <Route path="/artikelen" element={<Artikelen />} />
             <Route path="/licentiekosten" element={<LicentiekostenPage />} />
           </Routes>
