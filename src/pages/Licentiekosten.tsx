@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown, ChevronRight, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Ras, type Licentiehouder } from '../lib/supabase'
@@ -19,6 +19,7 @@ export default function Licentiekosten() {
   const [bulkVal, setBulkVal] = useState<Record<number, string>>({})
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
+  const savingRef = useRef(false)
   const [filterNietIngevuld, setFilterNietIngevuld] = useState(false)
   const [filterRas, setFilterRas] = useState('')
   const [filterLh, setFilterLh] = useState('')
@@ -98,13 +99,17 @@ export default function Licentiekosten() {
   }
 
   const saveTarief = async (code_groep: number, land: string, val: string) => {
+    if (savingRef.current) return   // voorkom dubbele aanroep via onBlur+Enter
+    savingRef.current = true
     const tarief = val.trim() ? parseFloat(val.replace(',', '.')) : null
     setTarieven(prev => ({ ...prev, [`${code_groep}_${land}`]: tarief }))
     setEditingKey(null)
     const { error: delErr } = await supabase.from('licentiekosten').delete().eq('code_groep', code_groep).eq('land', land)
-    if (delErr) { toast.error('Fout bij opslaan tarief: ' + delErr.message); return }
+    if (delErr) { toast.error('Fout bij opslaan: ' + delErr.message); savingRef.current = false; return }
     const { error: insErr } = await supabase.from('licentiekosten').insert({ code_groep, land, tarief })
-    if (insErr) toast.error('Fout bij opslaan tarief: ' + insErr.message)
+    if (insErr) toast.error('Fout bij opslaan: ' + insErr.message)
+    else toast.success(`${land} opgeslagen`)
+    savingRef.current = false
   }
 
   const applyBulk = async (code_groep: number, landen: string[]) => {

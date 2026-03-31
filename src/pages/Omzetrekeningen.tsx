@@ -207,6 +207,27 @@ export default function Omzetrekeningen() {
     }
   }
 
+  const fetchAllLk = async () => {
+    type LkRow = { code_groep: number; land: string; tarief: number | null }
+    const pageSize = 1000
+    let all: LkRow[] = []
+    let from = 0
+    while (true) {
+      const { data } = await supabase.from('licentiekosten').select('code_groep, land, tarief').range(from, from + pageSize - 1)
+      if (!data?.length) break
+      all = [...all, ...data as LkRow[]]
+      if (data.length < pageSize) break
+      from += pageSize
+    }
+    return all
+  }
+
+  const buildTkMap = (lk: { code_groep: number; land: string; tarief: number | null }[]): Record<string, number> => {
+    const map: Record<string, number> = {}
+    for (const t of lk) if (t.tarief != null) map[`${t.code_groep}_${t.land}`] = t.tarief
+    return map
+  }
+
   const fetchAllOmzet = async (): Promise<Omzetrekening[]> => {
     const pageSize = 1000
     let all: Omzetrekening[] = []
@@ -222,14 +243,14 @@ export default function Omzetrekeningen() {
   }
 
   const load = async () => {
-    const [omzetData, { data: deb }, { data: art }, { data: cgc }, { data: r }, { data: lh }, { data: lk }] = await Promise.all([
+    const [omzetData, { data: deb }, { data: art }, { data: cgc }, { data: r }, { data: lh }, lk] = await Promise.all([
       fetchAllOmzet(),
       supabase.from('debiteuren').select('nummer, land'),
       supabase.from('artikel_codes').select('artikel, code_groep'),
       supabase.from('code_groep_config').select('code_groep, ras_id'),
       supabase.from('rassen').select('id, naam, licentiehouder_id'),
       supabase.from('licentiehouders').select('id, naam'),
-      supabase.from('licentiekosten').select('code_groep, land, tarief'),
+      fetchAllLk(),
     ])
     setRows(omzetData)
 
@@ -262,11 +283,7 @@ export default function Omzetrekeningen() {
       if (c.ras_id != null && rasMap[c.ras_id]) cgRasMap[c.code_groep] = rasMap[c.ras_id]
     setCodeGroepRasMap(cgRasMap)
 
-    // Tarievenmap: `${code_groep}_${land}` → tarief
-    const tkMap: Record<string, number> = {}
-    for (const t of (lk ?? []) as { code_groep: number; land: string; tarief: number | null }[])
-      if (t.tarief != null) tkMap[`${t.code_groep}_${t.land}`] = t.tarief
-    setTarievenMap(tkMap)
+    setTarievenMap(buildTkMap(lk))
 
     setLoading(false)
   }
@@ -293,12 +310,12 @@ export default function Omzetrekeningen() {
       debFrom += 1000
     }
 
-    const [{ data: freshArt }, { data: freshCgc }, { data: freshR }, { data: freshLh }, { data: freshLk }] = await Promise.all([
+    const [{ data: freshArt }, { data: freshCgc }, { data: freshR }, { data: freshLh }, freshLk] = await Promise.all([
       supabase.from('artikel_codes').select('artikel, code_groep'),
       supabase.from('code_groep_config').select('code_groep, ras_id'),
       supabase.from('rassen').select('id, naam, licentiehouder_id'),
       supabase.from('licentiehouders').select('id, naam'),
-      supabase.from('licentiekosten').select('code_groep, land, tarief'),
+      fetchAllLk(),
     ])
     const freshDebMap: Record<number, string> = {}
     for (const d of allDeb) {
@@ -315,9 +332,7 @@ export default function Omzetrekeningen() {
     const freshCgRasMap: Record<number, { naam: string; lh_naam: string }> = {}
     for (const c of (freshCgc ?? []) as { code_groep: number; ras_id: number | null }[])
       if (c.ras_id != null && freshRasMap[c.ras_id]) freshCgRasMap[c.code_groep] = freshRasMap[c.ras_id]
-    const freshTkMap: Record<string, number> = {}
-    for (const t of (freshLk ?? []) as { code_groep: number; land: string; tarief: number | null }[])
-      if (t.tarief != null) freshTkMap[`${t.code_groep}_${t.land}`] = t.tarief
+    const freshTkMap = buildTkMap(freshLk)
 
     const parsed: RawRow[] = lines.map(line => {
       const c = line.split('\t')
@@ -376,12 +391,12 @@ export default function Omzetrekeningen() {
       if (data.length < 1000) break
       debFrom += 1000
     }
-    const [{ data: art }, { data: cgc }, { data: r }, { data: lh }, { data: lk }] = await Promise.all([
+    const [{ data: art }, { data: cgc }, { data: r }, { data: lh }, lk] = await Promise.all([
       supabase.from('artikel_codes').select('artikel, code_groep'),
       supabase.from('code_groep_config').select('code_groep, ras_id'),
       supabase.from('rassen').select('id, naam, licentiehouder_id'),
       supabase.from('licentiehouders').select('id, naam'),
-      supabase.from('licentiekosten').select('code_groep, land, tarief'),
+      fetchAllLk(),
     ])
 
     const debMap: Record<number, string> = {}
@@ -397,9 +412,7 @@ export default function Omzetrekeningen() {
     const cgRasMap: Record<number, { naam: string; lh_naam: string }> = {}
     for (const c of (cgc ?? []) as { code_groep: number; ras_id: number | null }[])
       if (c.ras_id != null && rasMap[c.ras_id]) cgRasMap[c.code_groep] = rasMap[c.ras_id]
-    const tkMap: Record<string, number> = {}
-    for (const t of (lk ?? []) as { code_groep: number; land: string; tarief: number | null }[])
-      if (t.tarief != null) tkMap[`${t.code_groep}_${t.land}`] = t.tarief
+    const tkMap = buildTkMap(lk)
 
     // Bereken updates per rij
     const updates = rows.map(r => {
