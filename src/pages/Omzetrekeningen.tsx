@@ -18,7 +18,7 @@ interface Omzetrekening {
   debiteur_naam: string | null
   land_debiteur: string | null
   artikel_omschrijving: string | null
-  artikel: number | null
+  artikel: string | null
   aantal: number | null
   soort: SoortPlant | null
   code_groep: number | null
@@ -103,7 +103,7 @@ const COL_KEYS = COLS.map(c => c.key)
 export default function Omzetrekeningen() {
   const [rows, setRows] = useState<Omzetrekening[]>([])
   const [debLandMap, setDebLandMap] = useState<Record<number, string>>({})
-  const [artikelGroepMap, setArtikelGroepMap] = useState<Record<number, number>>({})
+  const [artikelGroepMap, setArtikelGroepMap] = useState<Record<string, number>>({})
   const [codeGroepRasMap, setCodeGroepRasMap] = useState<Record<number, { naam: string; lh_naam: string }>>({})
   const [tarievenMap, setTarievenMap] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
@@ -264,9 +264,9 @@ export default function Omzetrekeningen() {
     setDebLandMap(debMap)
 
     // Artikel → code_groep
-    const artMap: Record<number, number> = {}
-    for (const a of (art ?? []) as { artikel: number; code_groep: number | null }[])
-      if (a.artikel != null && a.code_groep != null) artMap[a.artikel] = a.code_groep
+    const artMap: Record<string, number> = {}
+    for (const a of (art ?? []) as { artikel: number | string; code_groep: number | null }[])
+      if (a.artikel != null && a.code_groep != null) artMap[String(a.artikel)] = a.code_groep
     setArtikelGroepMap(artMap)
 
     // Licentiehouder naam map
@@ -317,9 +317,9 @@ export default function Omzetrekeningen() {
     for (const d of allDeb) {
       const nr = parseInt(d.nummer); if (!isNaN(nr)) freshDebMap[nr] = d.land
     }
-    const freshArtMap: Record<number, number> = {}
-    for (const a of (freshArt ?? []) as { artikel: number; code_groep: number | null }[])
-      if (a.artikel != null && a.code_groep != null) freshArtMap[a.artikel] = a.code_groep
+    const freshArtMap: Record<string, number> = {}
+    for (const a of (freshArt ?? []) as { artikel: number | string; code_groep: number | null }[])
+      if (a.artikel != null && a.code_groep != null) freshArtMap[String(a.artikel)] = a.code_groep
     const freshLhMap: Record<number, string> = {}
     for (const l of (freshLh ?? []) as { id: number; naam: string }[]) freshLhMap[l.id] = l.naam
     const freshRasMap: Record<number, { naam: string; lh_naam: string }> = {}
@@ -335,7 +335,7 @@ export default function Omzetrekeningen() {
       const rekening = c[1]?.trim() || null
       const parseIntNL = (s: string) => { const n = parseInt(s.replace(/\./g, ''), 10); return isNaN(n) ? null : n }
       const debiteur_nr = c[6]?.trim() ? parseIntNL(c[6]) : null
-      const artikel = c[9]?.trim() ? parseIntNL(c[9]) : null
+      const artikel = c[9]?.trim() || null
       const aantal = c[10]?.trim() ? parseIntNL(c[10]) : null
       const land_debiteur = debiteur_nr != null ? (freshDebMap[debiteur_nr] ?? null) : null
       const code_groep = artikel != null ? (freshArtMap[artikel] ?? null) : null
@@ -398,9 +398,9 @@ export default function Omzetrekeningen() {
 
     const debMap: Record<number, string> = {}
     for (const d of allDeb) { const nr = parseInt(d.nummer); if (!isNaN(nr)) debMap[nr] = d.land }
-    const artMap: Record<number, number> = {}
-    for (const a of (art ?? []) as { artikel: number; code_groep: number | null }[])
-      if (a.artikel != null && a.code_groep != null) artMap[a.artikel] = a.code_groep
+    const artMap: Record<string, number> = {}
+    for (const a of (art ?? []) as { artikel: number | string; code_groep: number | null }[])
+      if (a.artikel != null && a.code_groep != null) artMap[String(a.artikel)] = a.code_groep
     const lhMap: Record<number, string> = {}
     for (const l of (lh ?? []) as { id: number; naam: string }[]) lhMap[l.id] = l.naam
     const rasMap: Record<number, { naam: string; lh_naam: string }> = {}
