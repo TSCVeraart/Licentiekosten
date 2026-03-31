@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, Leaf, Package, TrendingUp, Tag, Euro, AlertCircle } from 'lucide-react'
+import { LayoutDashboard, Users, Leaf, Package, TrendingUp, Tag, Euro, AlertCircle, ClipboardList } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import Dashboard from './pages/Dashboard'
 import Debiteuren from './pages/Debiteuren'
@@ -10,6 +10,7 @@ import Omzetrekeningen from './pages/Omzetrekeningen'
 import Artikelen from './pages/Artikelen'
 import LicentiekostenPage from './pages/Licentiekosten'
 import OntbrekendeKosten from './pages/OntbrekendeKosten'
+import Checklist from './pages/Checklist'
 
 function useDebiteurenBadge() {
   const [count, setCount] = useState(0)
@@ -31,6 +32,38 @@ function useDebiteurenBadge() {
   }, [])
 
   return count
+}
+
+const CHECKLIST_ITEMS = 9
+
+function prevMonthStr() {
+  const d = new Date()
+  d.setDate(1); d.setMonth(d.getMonth() - 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function useChecklistBadge() {
+  const [open, setOpen] = useState(0)
+
+  const refresh = async () => {
+    if (new Date().getDate() < 10) { setOpen(0); return }
+    const { count } = await supabase
+      .from('checklist_maand')
+      .select('item', { count: 'exact', head: true })
+      .eq('maand', prevMonthStr())
+      .eq('afgevinkt', true)
+    const afgevinkt = count ?? 0
+    setOpen(CHECKLIST_ITEMS - afgevinkt)
+  }
+
+  useEffect(() => {
+    refresh()
+    const onFocus = () => refresh()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
+
+  return open
 }
 
 function useOntbrekendBadge() {
@@ -58,6 +91,7 @@ function useOntbrekendBadge() {
 export default function App() {
   const ontbrekendCount = useOntbrekendBadge()
   const debiteurenCount = useDebiteurenBadge()
+  const checklistOpen   = useChecklistBadge()
 
   return (
     <div className="layout">
@@ -112,6 +146,20 @@ export default function App() {
             )}
           </NavLink>
           <NavLink to="/artikelen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Tag />Artikelen</NavLink>
+          <div className="nav-section">Beheer</div>
+          <NavLink to="/checklist" className={({isActive}) => `nav-link ${isActive?'active':''}`}>
+            <ClipboardList />
+            Maandchecklist
+            {checklistOpen > 0 && (
+              <span style={{
+                marginLeft: 'auto', minWidth: 20, height: 20, borderRadius: 10,
+                background: 'var(--danger)', color: '#fff', fontSize: 11, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', lineHeight: 1,
+              }}>
+                {checklistOpen}
+              </span>
+            )}
+          </NavLink>
           <NavLink to="/licentiekosten" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Euro />Licentiekosten</NavLink>
         </nav>
       </aside>
@@ -126,6 +174,7 @@ export default function App() {
             <Route path="/ontbrekende-kosten" element={<OntbrekendeKosten />} />
             <Route path="/artikelen" element={<Artikelen />} />
             <Route path="/licentiekosten" element={<LicentiekostenPage />} />
+            <Route path="/checklist" element={<Checklist />} />
           </Routes>
         </div>
       </main>
