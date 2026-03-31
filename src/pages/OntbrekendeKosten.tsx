@@ -21,12 +21,13 @@ interface OmzetRij {
 }
 
 export const KLEUREN = [
-  { id: 'rood',   hex: '#ef4444', defaultLabel: 'Brondata aanpassen' },
-  { id: 'oranje', hex: '#f97316', defaultLabel: 'Geen tarief geconfigureerd' },
-  { id: 'geel',   hex: '#eab308', defaultLabel: 'Geen ras gekoppeld' },
-  { id: 'groen',  hex: '#22c55e', defaultLabel: 'Intern / geen kosten verwacht' },
-  { id: 'blauw',  hex: '#3b82f6', defaultLabel: 'Wordt nagekeken' },
-  { id: 'paars',  hex: '#a855f7', defaultLabel: 'Overige reden' },
+  { id: 'rood',        hex: '#ef4444', defaultLabel: 'Brondata aanpassen' },
+  { id: 'oranje',      hex: '#f97316', defaultLabel: 'Geen tarief geconfigureerd' },
+  { id: 'geel',        hex: '#eab308', defaultLabel: 'Geen ras gekoppeld' },
+  { id: 'groen',       hex: '#22c55e', defaultLabel: 'Intern / geen kosten verwacht' },
+  { id: 'codegroep',   hex: '#06b6d4', defaultLabel: 'Geen code groep' },
+  { id: 'lh',          hex: '#8b5cf6', defaultLabel: 'Geen licentiehouder' },
+  { id: 'paars',       hex: '#a855f7', defaultLabel: 'Overige reden' },
 ]
 
 export const LS_KLEUREN = 'ontbrekend-kleuren'
@@ -50,9 +51,11 @@ export default function OntbrekendeKosten() {
   const [editLabel, setEditLabel]   = useState<string | null>(null)
   const [editVal, setEditVal]       = useState('')
   const [popover, setPopover]       = useState<number | null>(null)
-  const [filterKleur, setFilterKleur]     = useState<string>('alle')
-  const [filterDebiteur, setFilterDebiteur] = useState<string[]>([])
-  const [selected, setSelected]     = useState<Set<number>>(new Set())
+  const [filterKleur, setFilterKleur]         = useState<string>('alle')
+  const [filterDebiteur, setFilterDebiteur]   = useState<string[]>([])
+  const [filterRas, setFilterRas]             = useState<string[]>([])
+  const [filterLh, setFilterLh]               = useState<string[]>([])
+  const [selected, setSelected]               = useState<Set<number>>(new Set())
   const popoverRef                  = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -135,6 +138,9 @@ export default function OntbrekendeKosten() {
     return nA.localeCompare(nB, 'nl')
   })
 
+  const rasOpties = [...new Set(rows.map(r => r.ras_naam).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, 'nl'))
+  const lhOpties  = [...new Set(rows.map(r => r.licentiehouder_naam).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, 'nl'))
+
   const filtered = rows.filter(r => {
     const q = search.toLowerCase()
     const matchQ = !q ||
@@ -151,7 +157,9 @@ export default function OntbrekendeKosten() {
         : kleuren[r.id] === filterKleur
     const matchDeb = filterDebiteur.length === 0 ||
       filterDebiteur.includes(`${r.debiteur_nr} – ${r.debiteur_naam}`)
-    return matchQ && matchKleur && matchDeb
+    const matchRas = filterRas.length === 0 || filterRas.includes(r.ras_naam ?? '')
+    const matchLh  = filterLh.length === 0  || filterLh.includes(r.licentiehouder_naam ?? '')
+    return matchQ && matchKleur && matchDeb && matchRas && matchLh
   })
 
   const allFilteredSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id))
@@ -184,7 +192,7 @@ export default function OntbrekendeKosten() {
 
   const aantalPerKleur = (kleurId: string) => rows.filter(r => kleuren[r.id] === kleurId).length
   const aantalZonderKleur = rows.filter(r => !kleuren[r.id]).length
-  const hasFilters = filterKleur !== 'alle' || filterDebiteur.length > 0
+  const hasFilters = filterKleur !== 'alle' || filterDebiteur.length > 0 || filterRas.length > 0 || filterLh.length > 0
 
   return (
     <>
@@ -259,14 +267,11 @@ export default function OntbrekendeKosten() {
           <Search className="search-icon" />
           <input placeholder="Zoek debiteur, ras, land…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <MultiSelect
-          label="Debiteuren"
-          options={debiteurOpties}
-          selected={filterDebiteur}
-          onChange={setFilterDebiteur}
-        />
+        <MultiSelect label="Debiteuren"     options={debiteurOpties} selected={filterDebiteur} onChange={setFilterDebiteur} />
+        <MultiSelect label="Rassen"          options={rasOpties}      selected={filterRas}      onChange={setFilterRas} />
+        <MultiSelect label="Licentiehouders" options={lhOpties}       selected={filterLh}       onChange={setFilterLh} />
         {hasFilters && (
-          <button className="btn btn-ghost" onClick={() => { setFilterKleur('alle'); setFilterDebiteur([]) }}>Wis filters</button>
+          <button className="btn btn-ghost" onClick={() => { setFilterKleur('alle'); setFilterDebiteur([]); setFilterRas([]); setFilterLh([]) }}>Wis filters</button>
         )}
       </div>
 
