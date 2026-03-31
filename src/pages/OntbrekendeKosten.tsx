@@ -92,6 +92,8 @@ export default function OntbrekendeKosten() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  const notifyKleurenChanged = () => window.dispatchEvent(new Event('ontbrekend-kleuren-changed'))
+
   const setKleur = (id: number, kleurId: string | null) => {
     setKleuren(prev => {
       const next = { ...prev }
@@ -101,6 +103,7 @@ export default function OntbrekendeKosten() {
       return next
     })
     setPopover(null)
+    notifyKleurenChanged()
   }
 
   const setBulkKleur = (kleurId: string | null) => {
@@ -114,6 +117,7 @@ export default function OntbrekendeKosten() {
       return next
     })
     setSelected(new Set())
+    notifyKleurenChanged()
   }
 
   const saveLabel = (kleurId: string) => {
