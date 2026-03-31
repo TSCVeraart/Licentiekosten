@@ -58,7 +58,14 @@ export default function OntbrekendeKosten() {
   const [editVal, setEditVal]       = useState('')
   const [popover, setPopover]       = useState<number | null>(null)
   const [selected, setSelected]               = useState<Set<number>>(new Set())
+  const [sortCol, setSortCol] = usePersistedState<string | null>('f-ontb-sortcol', null)
+  const [sortDir, setSortDir] = usePersistedState<'asc' | 'desc'>('f-ontb-sortdir', 'asc')
   const popoverRef                  = useRef<HTMLDivElement>(null)
+
+  const handleSort = (col: string) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -167,6 +174,13 @@ export default function OntbrekendeKosten() {
     const matchLh  = filterLh.length === 0  || filterLh.includes(r.licentiehouder_naam ?? '')
     return matchQ && matchKleur && matchDeb && matchRas && matchLh
   })
+
+  const sortedFiltered = sortCol ? [...filtered].sort((a, b) => {
+    const numCols = ['debiteur_nr', 'artikel', 'code_groep', 'aantal']
+    const av = numCols.includes(sortCol) ? ((a as any)[sortCol] ?? -Infinity) : ((a as any)[sortCol] ?? '').toString().toLowerCase()
+    const bv = numCols.includes(sortCol) ? ((b as any)[sortCol] ?? -Infinity) : ((b as any)[sortCol] ?? '').toString().toLowerCase()
+    return sortDir === 'asc' ? (av > bv ? 1 : av < bv ? -1 : 0) : (av < bv ? 1 : av > bv ? -1 : 0)
+  }) : filtered
 
   const allFilteredSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id))
   const someSelected = selected.size > 0
@@ -337,25 +351,36 @@ export default function OntbrekendeKosten() {
                   />
                 </th>
                 <th style={{ position: 'sticky', top: 0, zIndex: 1, width: 40 }}>Kleur</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Datum</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Deb. nr</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Naam</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Land</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Type</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Soort</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Rekening</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Artikel</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Code groep</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Ras</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Licentiehouder</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }} className="num">Aantal</th>
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}>Omschrijving</th>
+                {([
+                  ['datum',               'Datum'],
+                  ['debiteur_nr',         'Deb. nr'],
+                  ['debiteur_naam',       'Naam'],
+                  ['land_debiteur',       'Land'],
+                  ['intern_extern',       'Type'],
+                  ['soort',              'Soort'],
+                  ['rekening',           'Rekening'],
+                  ['artikel',            'Artikel'],
+                  ['code_groep',         'Code groep'],
+                  ['ras_naam',           'Ras'],
+                  ['licentiehouder_naam','Licentiehouder'],
+                  ['aantal',             'Aantal'],
+                  ['omschrijving',       'Omschrijving'],
+                ] as [string, string][]).map(([col, label]) => (
+                  <th
+                    key={col}
+                    onClick={() => handleSort(col)}
+                    className={col === 'aantal' ? 'num' : ''}
+                    style={{ position: 'sticky', top: 0, zIndex: 1, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                  >
+                    {label} {sortCol === col ? (sortDir === 'asc' ? '↑' : '↓') : <span style={{ opacity: 0.3 }}>↕</span>}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading && <tr><td colSpan={15} className="empty">Laden…</td></tr>}
-              {!loading && filtered.length === 0 && <tr><td colSpan={15} className="empty">Geen regels gevonden</td></tr>}
-              {filtered.map(r => {
+              {!loading && sortedFiltered.length === 0 && <tr><td colSpan={15} className="empty">Geen regels gevonden</td></tr>}
+              {sortedFiltered.map(r => {
                 const kleurId = kleuren[r.id] ?? null
                 const hex = kleurId ? getKleurHex(kleurId) : null
                 const isSelected = selected.has(r.id)
