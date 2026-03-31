@@ -271,9 +271,10 @@ export default function Omzetrekeningen() {
     const parsed: RawRow[] = lines.map(line => {
       const c = line.split('\t')
       const rekening = c[1]?.trim() || null
-      const debiteur_nr = c[6]?.trim() ? parseInt(c[6]) || null : null
-      const artikel = c[9]?.trim() ? parseInt(c[9]) || null : null
-      const aantal = c[10]?.trim() ? parseInt(c[10]) || null : null
+      const parseIntNL = (s: string) => { const n = parseInt(s.replace(/\./g, ''), 10); return isNaN(n) ? null : n }
+      const debiteur_nr = c[6]?.trim() ? parseIntNL(c[6]) : null
+      const artikel = c[9]?.trim() ? parseIntNL(c[9]) : null
+      const aantal = c[10]?.trim() ? parseIntNL(c[10]) : null
       const land_debiteur = debiteur_nr != null ? (freshDebMap[debiteur_nr] ?? null) : null
       const code_groep = artikel != null ? (freshArtMap[artikel] ?? null) : null
       const rasInfo = code_groep != null ? (freshCgRasMap[code_groep] ?? null) : null
