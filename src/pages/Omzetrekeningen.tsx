@@ -366,6 +366,7 @@ export default function Omzetrekeningen() {
         licentiekosten,
         totaal_licentiekosten,
         intern_extern: internExtern(debiteur_nr, rasInfo?.lh_naam ?? null),
+        kleur: null,
       }
     })
     setPreview(parsed)
