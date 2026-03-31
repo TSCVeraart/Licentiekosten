@@ -72,31 +72,32 @@ const fmtTarief = (v: number | null) =>
   v != null ? `€ ${v.toFixed(4)}` : '–'
 
 const DEFAULT_COL_WIDTHS: Record<string, number> = {
-  datum: 105, rekening: 80, omschrijving: 200, debet_eur: 110, credit_eur: 110,
-  vv_bedrag: 110, debiteur_nr: 80, debiteur_naam: 160, land_debiteur: 70,
-  soort: 90, artikel: 80, code_groep: 95, ras_naam: 140, licentiehouder_naam: 150,
-  licentiekosten: 90, totaal_licentiekosten: 110, intern_extern: 75, aantal: 80,
+  datum: 105, rekening: 80, artikel_omschrijving: 200, debet_eur: 110, credit_eur: 110,
+  vv_bedrag: 110, debiteur_nr: 80, land_debiteur: 90, intern_extern: 110, debiteur_naam: 160,
+  omschrijving: 200, soort: 90, ras_naam: 140, licentiehouder_naam: 150,
+  artikel: 80, code_groep: 120, aantal: 80, licentiekosten: 150, totaal_licentiekosten: 150,
 }
 
 const COLS: { key: string; label: string; num?: boolean }[] = [
-  { key: 'datum',              label: 'Datum' },
-  { key: 'rekening',          label: 'Rekening' },
-  { key: 'omschrijving',      label: 'Omschrijving' },
-  { key: 'debet_eur',         label: 'Debet EUR',      num: true },
-  { key: 'credit_eur',        label: 'Credit EUR',     num: true },
-  { key: 'vv_bedrag',         label: 'V.V.-bedrag',    num: true },
-  { key: 'debiteur_nr',       label: 'Debiteur' },
-  { key: 'debiteur_naam',     label: 'Naam' },
-  { key: 'land_debiteur',     label: 'Land' },
-  { key: 'soort',             label: 'Soort' },
-  { key: 'artikel',           label: 'Artikel' },
-  { key: 'code_groep',        label: 'Code groep' },
-  { key: 'ras_naam',          label: 'Ras' },
-  { key: 'licentiehouder_naam', label: 'Licentiehouder' },
-  { key: 'licentiekosten',    label: 'Tarief' },
-  { key: 'totaal_licentiekosten', label: 'Totaal LK',  num: true },
-  { key: 'intern_extern',     label: 'Type' },
-  { key: 'aantal',            label: 'Aantal',         num: true },
+  { key: 'datum',                   label: 'Datum' },
+  { key: 'rekening',                label: 'Rekening' },
+  { key: 'artikel_omschrijving',    label: 'Artikelomschrijving' },
+  { key: 'debet_eur',               label: 'Debet EUR',                num: true },
+  { key: 'credit_eur',              label: 'Credit EUR',               num: true },
+  { key: 'vv_bedrag',               label: 'V.V.-bedrag',              num: true },
+  { key: 'debiteur_nr',             label: 'Debiteur' },
+  { key: 'land_debiteur',           label: 'Country' },
+  { key: 'intern_extern',           label: 'Intern / Extern' },
+  { key: 'debiteur_naam',           label: 'Debiteur: Naam' },
+  { key: 'omschrijving',            label: 'Omschrijving' },
+  { key: 'soort',                   label: 'Soort' },
+  { key: 'ras_naam',                label: 'Ras' },
+  { key: 'licentiehouder_naam',     label: 'Licentiehouder' },
+  { key: 'artikel',                 label: 'Artikel' },
+  { key: 'code_groep',              label: 'Artikelcode groep' },
+  { key: 'aantal',                  label: 'Aantal',                   num: true },
+  { key: 'licentiekosten',          label: 'Licentiekosten per plant' },
+  { key: 'totaal_licentiekosten',   label: 'Totaal licentiekosten',    num: true },
 ]
 const COL_KEYS = COLS.map(c => c.key)
 
@@ -113,9 +114,12 @@ export default function Omzetrekeningen() {
   const [herberekening, setHerberekening] = useState(false)
   const [herberekeningVoortgang, setHerberekeningVoortgang] = useState<{gedaan: number; totaal: number} | null>(null)
   const [search, setSearch] = usePersistedState('f-omzet-search', '')
-  const [colOrder, setColOrder] = useState<string[]>(
-    () => JSON.parse(localStorage.getItem('omzet-col-order') ?? 'null') ?? COL_KEYS
-  )
+  const [colOrder, setColOrder] = useState<string[]>(() => {
+    const stored = JSON.parse(localStorage.getItem('omzet-col-order') ?? 'null') as string[] | null
+    if (!stored) return COL_KEYS
+    const missing = COL_KEYS.filter(k => !stored.includes(k))
+    return [...stored.filter(k => COL_KEYS.includes(k)), ...missing]
+  })
   const [dragKey, setDragKey] = useState<string | null>(null)
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   const [filterSoort,    setFilterSoort]    = usePersistedState<string[]>('f-omzet-soort', [])
@@ -187,8 +191,9 @@ export default function Omzetrekeningen() {
   const renderCell = (r: Omzetrekening, key: string) => {
     switch (key) {
       case 'datum':              return <td key={key} className="mono" style={{ whiteSpace: 'nowrap' }}>{r.datum ?? '–'}</td>
-      case 'rekening':           return <td key={key} className="mono text-muted" style={{ fontSize: 12 }}>{r.rekening ?? '–'}</td>
-      case 'omschrijving':       return <td key={key} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.omschrijving ?? '–'}</td>
+      case 'rekening':               return <td key={key} className="mono text-muted" style={{ fontSize: 12 }}>{r.rekening ?? '–'}</td>
+      case 'artikel_omschrijving':   return <td key={key} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.artikel_omschrijving ?? <span className="text-muted">–</span>}</td>
+      case 'omschrijving':           return <td key={key} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.omschrijving ?? '–'}</td>
       case 'debet_eur':          return <td key={key} className="num">{fmt(r.debet_eur)}</td>
       case 'credit_eur':         return <td key={key} className="num">{fmt(r.credit_eur)}</td>
       case 'vv_bedrag':          return <td key={key} className="num">{fmt(r.vv_bedrag)}</td>
