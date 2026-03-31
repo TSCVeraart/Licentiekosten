@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, Leaf, Package, BookOpen, TrendingUp, Tag, Euro, AlertCircle } from 'lucide-react'
+import { LayoutDashboard, Users, Leaf, Package, TrendingUp, Tag, Euro, AlertCircle } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import Dashboard from './pages/Dashboard'
 import Debiteuren from './pages/Debiteuren'
 import Licentiehouders from './pages/Licentiehouders'
 import Rassen from './pages/Rassen'
-import Grootboek from './pages/Grootboek'
 import Omzetrekeningen from './pages/Omzetrekeningen'
 import Artikelen from './pages/Artikelen'
 import LicentiekostenPage from './pages/Licentiekosten'
@@ -91,8 +90,7 @@ export default function App() {
           <NavLink to="/licentiehouders" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Leaf />Licentiehouders</NavLink>
           <NavLink to="/rassen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Package />Rassen</NavLink>
           <div className="nav-section">Boekingen</div>
-          <NavLink to="/grootboek" className={({isActive}) => `nav-link ${isActive?'active':''}`}><BookOpen />Grootboek 1955</NavLink>
-          <NavLink to="/omzetrekeningen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><TrendingUp />Omzetrekeningen</NavLink>
+<NavLink to="/omzetrekeningen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><TrendingUp />Omzetrekeningen</NavLink>
           <NavLink to="/ontbrekende-kosten" className={({isActive}) => `nav-link ${isActive?'active':''}`}>
             <AlertCircle />
             Ontbrekende kosten
@@ -124,8 +122,7 @@ export default function App() {
             <Route path="/debiteuren" element={<Debiteuren />} />
             <Route path="/licentiehouders" element={<Licentiehouders />} />
             <Route path="/rassen" element={<Rassen />} />
-            <Route path="/grootboek" element={<Grootboek />} />
-            <Route path="/omzetrekeningen" element={<Omzetrekeningen />} />
+<Route path="/omzetrekeningen" element={<Omzetrekeningen />} />
             <Route path="/ontbrekende-kosten" element={<OntbrekendeKosten />} />
             <Route path="/artikelen" element={<Artikelen />} />
             <Route path="/licentiekosten" element={<LicentiekostenPage />} />

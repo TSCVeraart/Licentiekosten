@@ -27,11 +27,17 @@ export default function Artikelen() {
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
-    const { data } = await supabase
-      .from('artikel_codes')
-      .select('*')
-      .order('artikel')
-    setRows((data ?? []) as ArtikelCode[])
+    const pageSize = 1000
+    let all: ArtikelCode[] = []
+    let from = 0
+    while (true) {
+      const { data } = await supabase.from('artikel_codes').select('*').order('artikel').range(from, from + pageSize - 1)
+      if (!data?.length) break
+      all = [...all, ...data as ArtikelCode[]]
+      if (data.length < pageSize) break
+      from += pageSize
+    }
+    setRows(all)
     setLoading(false)
   }
   useEffect(() => { load() }, [])

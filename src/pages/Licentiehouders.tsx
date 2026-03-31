@@ -20,6 +20,7 @@ export default function Licentiehouders() {
       .from('licentiehouders')
       .select('*, rassen(*)')
       .order('naam')
+      .limit(10000)
     setRows((data as any[]) ?? [])
     setLoading(false)
   }
