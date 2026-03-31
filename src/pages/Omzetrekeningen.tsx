@@ -3,6 +3,7 @@ import { Upload, Trash2, Search } from 'lucide-react'
 import { MultiSelect } from '../lib/MultiSelect'
 import toast from 'react-hot-toast'
 import { supabase, type SoortPlant } from '../lib/supabase'
+import { loadOntbrekendKleuren, getKleurHex } from './OntbrekendeKosten'
 
 interface Omzetrekening {
   id: number
@@ -122,6 +123,7 @@ export default function Omzetrekeningen() {
   const [filterDatumTot, setFilterDatumTot] = useState('')
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [rijKleuren, setRijKleuren] = useState<Record<number, string>>(loadOntbrekendKleuren)
   const [colWidths, setColWidths] = useState<Record<string, number>>(
     () => JSON.parse(localStorage.getItem('omzet-col-widths') ?? 'null') ?? {}
   )
@@ -267,6 +269,12 @@ export default function Omzetrekeningen() {
     setLoading(false)
   }
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    const onFocus = () => setRijKleuren(loadOntbrekendKleuren())
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
 
   const parsePaste = async () => {
     const lines = paste.trim().split('\n').map(l => l.replace(/\r$/, '')).filter(l => l.trim())
@@ -554,12 +562,22 @@ export default function Omzetrekeningen() {
             <tbody>
               {loading && <tr><td colSpan={orderedCols.length + 1} className="empty">Laden…</td></tr>}
               {!loading && filtered.length === 0 && <tr><td colSpan={orderedCols.length + 1} className="empty">Geen regels gevonden</td></tr>}
-              {filtered.map(r => (
-                <tr key={r.id}>
-                  {orderedCols.map(col => renderCell(r, col.key))}
-                  <td><button className="btn btn-ghost" onClick={() => remove(r.id)}><Trash2 /></button></td>
-                </tr>
-              ))}
+              {filtered.map(r => {
+                const kleurId = rijKleuren[r.id]
+                const hex = kleurId ? getKleurHex(kleurId) : null
+                return (
+                  <tr
+                    key={r.id}
+                    style={{
+                      borderLeft: hex ? `4px solid ${hex}` : undefined,
+                      background: hex ? hex + '0d' : undefined,
+                    }}
+                  >
+                    {orderedCols.map(col => renderCell(r, col.key))}
+                    <td><button className="btn btn-ghost" onClick={() => remove(r.id)}><Trash2 /></button></td>
+                  </tr>
+                )
+              })}
             </tbody>
             {filtered.length > 0 && (
               <tfoot>
