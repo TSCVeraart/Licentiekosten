@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePersistedState } from '../lib/usePersistedState'
-import { Search, Pencil, Check } from 'lucide-react'
+import { Search, Pencil, Check, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { MultiSelect } from '../lib/MultiSelect'
+import { exportCsv } from '../lib/exportCsv'
 
 interface OmzetRij {
   id: number
   datum: string | null
   rekening: string | null
   omschrijving: string | null
+  artikel_omschrijving: string | null
   debiteur_nr: number | null
   debiteur_naam: string | null
   land_debiteur: string | null
@@ -72,7 +74,7 @@ export default function OntbrekendeKosten() {
       while (true) {
         const { data } = await supabase
           .from('omzetrekeningen')
-          .select('id,datum,rekening,omschrijving,debiteur_nr,debiteur_naam,land_debiteur,soort,artikel,code_groep,ras_naam,licentiehouder_naam,intern_extern,aantal,kleur')
+          .select('id,datum,rekening,omschrijving,artikel_omschrijving,debiteur_nr,debiteur_naam,land_debiteur,soort,artikel,code_groep,ras_naam,licentiehouder_naam,intern_extern,aantal,kleur')
           .is('totaal_licentiekosten', null)
           .order('datum', { ascending: false })
           .range(from, from + pageSize - 1)
@@ -208,6 +210,13 @@ export default function OntbrekendeKosten() {
           <div className="page-title">Ontbrekende licentiekosten</div>
           <div className="page-sub">{rows.length} regels zonder licentiekosten</div>
         </div>
+        <button className="btn btn-ghost" onClick={() => exportCsv(
+          `ontbrekende-kosten-${new Date().toISOString().slice(0,10)}.csv`,
+          ['Datum','Rekening','Debiteur','Country','Intern / Extern','Debiteur: Naam','Artikelomschrijving','Soort','Ras','Licentiehouder','Artikel','Artikelcode groep','Aantal','Kleur'],
+          sortedFiltered.map(r => [r.datum,r.rekening,r.debiteur_nr,r.land_debiteur,r.intern_extern,r.debiteur_naam,r.artikel_omschrijving,r.soort,r.ras_naam,r.licentiehouder_naam,r.artikel,r.code_groep,r.aantal,r.kleur])
+        )}>
+          <Download size={14} /> Exporteren
+        </button>
       </div>
 
       {/* Legenda */}
@@ -450,7 +459,7 @@ export default function OntbrekendeKosten() {
                     <td>{r.land_debiteur ?? <span className="text-muted">–</span>}</td>
                     <td>{r.intern_extern ?? <span className="text-muted">–</span>}</td>
                     <td>{r.debiteur_naam ?? '–'}</td>
-                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--muted)' }}>{r.omschrijving ?? '–'}</td>
+                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--muted)' }}>{r.artikel_omschrijving ?? '–'}</td>
                     <td>{r.soort ? <span className={`badge badge-${r.soort.toLowerCase()}`}>{r.soort}</span> : <span className="text-muted">–</span>}</td>
                     <td>{r.ras_naam ?? <span className="text-muted">–</span>}</td>
                     <td style={{ fontSize: 12, color: 'var(--muted)' }}>{r.licentiehouder_naam ?? '–'}</td>

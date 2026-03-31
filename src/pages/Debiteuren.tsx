@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { usePersistedState } from '../lib/usePersistedState'
-import { Plus, Search, Pencil, Trash2, X, Upload } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, X, Upload, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Debiteur, type DebiteurType } from '../lib/supabase'
+import { exportCsv } from '../lib/exportCsv'
 
 const LANDEN = ['NL','BE','DE','GB','FR','IT','ES','AT','CH','DK','SE','FI','PL','CZ','GR','IE','LV','BY','AM','AE','MA','US','CA','Other']
 const EMPTY: Omit<Debiteur,'id'|'created_at'|'updated_at'> = { nummer:'', naam:'', land:'NL', type:'Extern', actief:true }
@@ -139,6 +140,13 @@ export default function Debiteuren() {
               <Trash2 size={15} /> Alles verwijderen
             </button>
           )}
+          <button className="btn btn-ghost" onClick={() => exportCsv(
+            `debiteuren-${new Date().toISOString().slice(0,10)}.csv`,
+            ['Nummer','Naam','Land','Type','Actief'],
+            filtered.map(r => [r.nummer, r.naam, r.land, r.type, r.actief ? 'Ja' : 'Nee'])
+          )}>
+            <Download size={14} /> Exporteren
+          </button>
           <button className="btn btn-primary" onClick={() => { setForm(EMPTY); setEditId(null); setModal('add') }}>
             <Plus /> Nieuwe debiteur
           </button>

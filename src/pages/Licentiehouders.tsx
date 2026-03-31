@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, ChevronDown, ChevronRight, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Licentiehouder, type Ras, type SoortPlant } from '../lib/supabase'
+import { exportCsv } from '../lib/exportCsv'
 
 const EMPTY_RAS = { naam: '', soort: 'Aardbei' as SoortPlant, tarief: 0, actief: true }
 
@@ -72,9 +73,18 @@ export default function Licentiehouders() {
           <div className="page-title">Licentiehouders</div>
           <div className="page-sub">{rows.length} licentiehouders</div>
         </div>
-        <button className="btn btn-primary" onClick={() => { setForm({ naam: '' }); setEditId(null); setModal('lh-add') }}>
-          <Plus /> Nieuwe licentiehouder
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={() => exportCsv(
+            `licentiehouders-${new Date().toISOString().slice(0,10)}.csv`,
+            ['Licentiehouder','Rassen'],
+            rows.map(lh => [lh.naam, (lh.rassen ?? []).map((r: Ras) => r.naam).join(', ')])
+          )}>
+            <Download size={14} /> Exporteren
+          </button>
+          <button className="btn btn-primary" onClick={() => { setForm({ naam: '' }); setEditId(null); setModal('lh-add') }}>
+            <Plus /> Nieuwe licentiehouder
+          </button>
+        </div>
       </div>
 
       <div className="card">

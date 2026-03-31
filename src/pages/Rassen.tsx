@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { usePersistedState } from '../lib/usePersistedState'
-import { Plus, Pencil, Trash2, X, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Search, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Ras, type Licentiehouder, type SoortPlant } from '../lib/supabase'
+import { exportCsv } from '../lib/exportCsv'
 
 const LANDEN = ['NL','BE','LU','DE','GB','IE','FR','PL','AT','CH','IT','DK','SE','FI','NO','EE','LV','LT','ES','PT','MT','RO','AR','MA','TN','BY','AM','GR','HU','SK','DZ','HR','BG','SI','RU','AE']
 
@@ -135,7 +136,16 @@ export default function Rassen() {
           <div className="page-title">Rassen</div>
           <div className="page-sub">{rassen.length} rassen</div>
         </div>
-        <button className="btn btn-primary" onClick={openAdd}><Plus /> Nieuw ras</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={() => exportCsv(
+            `rassen-${new Date().toISOString().slice(0,10)}.csv`,
+            ['Ras','Soort','Licentiehouder','Landen','Actief'],
+            filtered.map(r => [r.naam, r.soort, r.licentiehouder_naam ?? '', (r.landen ?? []).join(', '), r.actief ? 'Ja' : 'Nee'])
+          )}>
+            <Download size={14} /> Exporteren
+          </button>
+          <button className="btn btn-primary" onClick={openAdd}><Plus /> Nieuw ras</button>
+        </div>
       </div>
 
       <div className="filters">

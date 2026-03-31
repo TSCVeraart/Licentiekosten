@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePersistedState } from '../lib/usePersistedState'
-import { Check, ChevronDown, ChevronRight, Search } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Search, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Ras, type Licentiehouder } from '../lib/supabase'
+import { exportCsv } from '../lib/exportCsv'
 
 interface CodeGroep { code_groep: number; omschrijving: string | null }
 interface RasDetail extends Ras { lh_naam: string; landen: string[] }
@@ -147,6 +148,19 @@ export default function Licentiekosten() {
             className={`btn ${filterNietIngevuld ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setFilterNietIngevuld(f => !f)}
           >Niet ingevuld</button>
+          <button className="btn btn-ghost" onClick={() => {
+            const exportRows: unknown[][] = []
+            for (const cg of codeGroepen) {
+              const ras = rassen.find(r => r.id === (rasConfigs[cg.code_groep] ?? null))
+              for (const land of (ras?.landen ?? [])) {
+                exportRows.push([cg.code_groep, cg.omschrijving, ras?.naam ?? '', land, tarieven[`${cg.code_groep}_${land}`] ?? ''])
+              }
+            }
+            exportCsv(`licentiekosten-${new Date().toISOString().slice(0,10)}.csv`,
+              ['Code groep','Omschrijving','Ras','Land','Tarief'], exportRows)
+          }}>
+            <Download size={14} /> Exporteren
+          </button>
           <button className="btn btn-secondary" onClick={() => {
             const next = new Set(codeGroepen.map(cg => cg.code_groep))
             setCollapsed(next)

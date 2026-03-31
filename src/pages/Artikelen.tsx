@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Upload, Trash2, Search, Plus, X } from 'lucide-react'
+import { Upload, Trash2, Search, Plus, X, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import { exportCsv } from '../lib/exportCsv'
 
 interface ArtikelCode {
   id: number
@@ -123,9 +124,18 @@ export default function Artikelen() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {rows.length > 0 && (
-            <button className="btn btn-ghost" style={{ color: 'var(--danger)' }} onClick={removeAll}>
-              <Trash2 size={15} /> Alles verwijderen
-            </button>
+            <>
+              <button className="btn btn-ghost" onClick={() => exportCsv(
+                `artikelen-${new Date().toISOString().slice(0,10)}.csv`,
+                ['Artikel','Omschrijving','Code groep'],
+                filtered.map(r => [r.artikel, r.omschrijving, r.code_groep])
+              )}>
+                <Download size={14} /> Exporteren
+              </button>
+              <button className="btn btn-ghost" style={{ color: 'var(--danger)' }} onClick={removeAll}>
+                <Trash2 size={15} /> Alles verwijderen
+              </button>
+            </>
           )}
           <button className="btn btn-primary" onClick={() => { setForm({ artikel: '', omschrijving: '', code_groep: '' }); setModal(true) }}>
             <Plus /> Artikel toevoegen

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Upload, Trash2, Search, RefreshCw } from 'lucide-react'
+import { Upload, Trash2, Search, RefreshCw, Download } from 'lucide-react'
 import { MultiSelect } from '../lib/MultiSelect'
 import toast from 'react-hot-toast'
 import { supabase, type SoortPlant } from '../lib/supabase'
 import { getKleurHex } from './OntbrekendeKosten'
+import { exportCsv } from '../lib/exportCsv'
 import { usePersistedState } from '../lib/usePersistedState'
 
 interface Omzetrekening {
@@ -512,6 +513,13 @@ export default function Omzetrekeningen() {
         </div>
         {rows.length > 0 && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-ghost" onClick={() => exportCsv(
+              `omzetrekeningen-${new Date().toISOString().slice(0,10)}.csv`,
+              orderedCols.map(c => c.label),
+              filtered.map(r => orderedCols.map(c => (r as any)[c.key]))
+            )}>
+              <Download size={14} /> Exporteren
+            </button>
             <button className="btn btn-secondary" onClick={herbereken} disabled={herberekening}>
               <RefreshCw size={14} style={{ animation: herberekening ? 'spin 1s linear infinite' : undefined }} />
               {herberekening && herberekeningVoortgang
