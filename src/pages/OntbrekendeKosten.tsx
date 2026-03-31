@@ -28,6 +28,7 @@ export const KLEUREN = [
   { id: 'groen',       hex: '#22c55e', defaultLabel: 'Intern / geen kosten verwacht' },
   { id: 'codegroep',   hex: '#06b6d4', defaultLabel: 'Geen code groep' },
   { id: 'lh',          hex: '#8b5cf6', defaultLabel: 'Geen licentiehouder' },
+  { id: 'landlicent',  hex: '#f43f5e', defaultLabel: 'Land geen licentie' },
   { id: 'paars',       hex: '#a855f7', defaultLabel: 'Overige reden' },
 ]
 
