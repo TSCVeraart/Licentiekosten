@@ -76,30 +76,46 @@ export default function Licentiekosten() {
 
   const saveRasLink = async (code_groep: number, ras_id: number | null) => {
     setRasConfigs(prev => ({ ...prev, [code_groep]: ras_id }))
-    await supabase.from('code_groep_config').upsert({ code_groep, ras_id }, { onConflict: 'code_groep' })
+    const { data: existing } = await supabase.from('code_groep_config').select('code_groep').eq('code_groep', code_groep).maybeSingle()
+    const { error } = existing
+      ? await supabase.from('code_groep_config').update({ ras_id }).eq('code_groep', code_groep)
+      : await supabase.from('code_groep_config').insert({ code_groep, ras_id })
+    if (error) toast.error('Fout bij opslaan ras: ' + error.message)
   }
 
   const saveTarief = async (code_groep: number, land: string, val: string) => {
-    const tarief = val.trim() ? parseFloat(val.replace(',', '.')) || null : null
-    setTarieven(prev => ({ ...prev, [`${code_groep}_${land}`]: tarief }))
+    const tarief = val.trim() ? parseFloat(val.replace(',', '.')) : null
+    const key = `${code_groep}_${land}`
+    setTarieven(prev => ({ ...prev, [key]: tarief }))
     setEditingKey(null)
-    await supabase.from('licentiekosten').upsert({ code_groep, land, tarief }, { onConflict: 'code_groep,land' })
+    const { data: existing } = await supabase.from('licentiekosten').select('code_groep').eq('code_groep', code_groep).eq('land', land).maybeSingle()
+    const { error } = existing
+      ? await supabase.from('licentiekosten').update({ tarief }).eq('code_groep', code_groep).eq('land', land)
+      : await supabase.from('licentiekosten').insert({ code_groep, land, tarief })
+    if (error) toast.error('Fout bij opslaan tarief: ' + error.message)
   }
 
   const applyBulk = async (code_groep: number, landen: string[]) => {
     const val = bulkVal[code_groep]
     if (!val?.trim()) return
-    const tarief = parseFloat(val.replace(',', '.')) || null
-    await supabase.from('licentiekosten').upsert(
-      landen.map(land => ({ code_groep, land, tarief })),
-      { onConflict: 'code_groep,land' }
-    )
-    setTarieven(prev => {
-      const next = { ...prev }
-      for (const land of landen) next[`${code_groep}_${land}`] = tarief
-      return next
-    })
-    toast.success('Tarief toegepast')
+    const tarief = parseFloat(val.replace(',', '.'))
+    const errors: string[] = []
+    await Promise.all(landen.map(async land => {
+      const { data: existing } = await supabase.from('licentiekosten').select('code_groep').eq('code_groep', code_groep).eq('land', land).maybeSingle()
+      const { error } = existing
+        ? await supabase.from('licentiekosten').update({ tarief }).eq('code_groep', code_groep).eq('land', land)
+        : await supabase.from('licentiekosten').insert({ code_groep, land, tarief })
+      if (error) errors.push(land)
+    }))
+    if (errors.length) toast.error(`Fout bij opslaan voor: ${errors.join(', ')}`)
+    else {
+      setTarieven(prev => {
+        const next = { ...prev }
+        for (const land of landen) next[`${code_groep}_${land}`] = tarief
+        return next
+      })
+      toast.success('Tarief toegepast')
+    }
   }
 
   if (loading) return <div className="empty">Laden…</div>
