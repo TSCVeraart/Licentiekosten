@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Upload, Trash2, Search } from 'lucide-react'
+import { Upload, Trash2, Search, RefreshCw } from 'lucide-react'
 import { MultiSelect } from '../lib/MultiSelect'
 import toast from 'react-hot-toast'
 import { supabase, type SoortPlant } from '../lib/supabase'
@@ -108,6 +108,8 @@ export default function Omzetrekeningen() {
   const [paste, setPaste] = useState('')
   const [preview, setPreview] = useState<RawRow[] | null>(null)
   const [importing, setImporting] = useState(false)
+  const [herberekening, setHerberekening] = useState(false)
+  const [herberekeningVoortgang, setHerberekeningVoortgang] = useState<{gedaan: number; totaal: number} | null>(null)
   const [search, setSearch] = useState('')
   const [colOrder, setColOrder] = useState<string[]>(
     () => JSON.parse(localStorage.getItem('omzet-col-order') ?? 'null') ?? COL_KEYS
@@ -359,6 +361,86 @@ export default function Omzetrekeningen() {
     toast.success(`${parsed.length} regels herkend`)
   }
 
+  const herbereken = async () => {
+    if (!confirm(`Alle ${rows.length} regels opnieuw berekenen op basis van huidige referentiedata (debiteuren, artikelen, tarieven)?`)) return
+    setHerberekening(true)
+    setHerberekeningVoortgang({ gedaan: 0, totaal: rows.length })
+
+    // Laad verse referentiedata
+    const allDeb: { nummer: string; land: string }[] = []
+    let debFrom = 0
+    while (true) {
+      const { data } = await supabase.from('debiteuren').select('nummer, land').range(debFrom, debFrom + 999)
+      if (!data?.length) break
+      allDeb.push(...data as typeof allDeb)
+      if (data.length < 1000) break
+      debFrom += 1000
+    }
+    const [{ data: art }, { data: cgc }, { data: r }, { data: lh }, { data: lk }] = await Promise.all([
+      supabase.from('artikel_codes').select('artikel, code_groep'),
+      supabase.from('code_groep_config').select('code_groep, ras_id'),
+      supabase.from('rassen').select('id, naam, licentiehouder_id'),
+      supabase.from('licentiehouders').select('id, naam'),
+      supabase.from('licentiekosten').select('code_groep, land, tarief'),
+    ])
+
+    const debMap: Record<number, string> = {}
+    for (const d of allDeb) { const nr = parseInt(d.nummer); if (!isNaN(nr)) debMap[nr] = d.land }
+    const artMap: Record<number, number> = {}
+    for (const a of (art ?? []) as { artikel: number; code_groep: number | null }[])
+      if (a.artikel != null && a.code_groep != null) artMap[a.artikel] = a.code_groep
+    const lhMap: Record<number, string> = {}
+    for (const l of (lh ?? []) as { id: number; naam: string }[]) lhMap[l.id] = l.naam
+    const rasMap: Record<number, { naam: string; lh_naam: string }> = {}
+    for (const ras of (r ?? []) as { id: number; naam: string; licentiehouder_id: number }[])
+      rasMap[ras.id] = { naam: ras.naam, lh_naam: lhMap[ras.licentiehouder_id] ?? '–' }
+    const cgRasMap: Record<number, { naam: string; lh_naam: string }> = {}
+    for (const c of (cgc ?? []) as { code_groep: number; ras_id: number | null }[])
+      if (c.ras_id != null && rasMap[c.ras_id]) cgRasMap[c.code_groep] = rasMap[c.ras_id]
+    const tkMap: Record<string, number> = {}
+    for (const t of (lk ?? []) as { code_groep: number; land: string; tarief: number | null }[])
+      if (t.tarief != null) tkMap[`${t.code_groep}_${t.land}`] = t.tarief
+
+    // Bereken updates per rij
+    const updates = rows.map(r => {
+      const land_debiteur = r.debiteur_nr != null ? (debMap[r.debiteur_nr] ?? r.land_debiteur) : r.land_debiteur
+      const code_groep    = r.artikel != null ? (artMap[r.artikel] ?? r.code_groep) : r.code_groep
+      const rasInfo       = code_groep != null ? (cgRasMap[code_groep] ?? null) : null
+      const licentiekosten = (code_groep != null && land_debiteur != null)
+        ? (tkMap[`${code_groep}_${land_debiteur}`] ?? null)
+        : null
+      const totaal_licentiekosten = (r.aantal != null && licentiekosten != null) ? r.aantal * licentiekosten : null
+      return {
+        id: r.id,
+        land_debiteur,
+        code_groep,
+        ras_naam: rasInfo?.naam ?? null,
+        licentiehouder_naam: rasInfo?.lh_naam ?? null,
+        licentiekosten,
+        totaal_licentiekosten,
+        intern_extern: internExtern(r.debiteur_nr, rasInfo?.lh_naam ?? null),
+      }
+    })
+
+    // Verwerk in batches van 50
+    const batchSize = 50
+    let gedaan = 0
+    for (let i = 0; i < updates.length; i += batchSize) {
+      const batch = updates.slice(i, i + batchSize)
+      await Promise.all(batch.map(u => {
+        const { id, ...fields } = u
+        return supabase.from('omzetrekeningen').update(fields).eq('id', id)
+      }))
+      gedaan += batch.length
+      setHerberekeningVoortgang({ gedaan, totaal: updates.length })
+    }
+
+    toast.success(`${updates.length} regels herberekend`)
+    setHerberekening(false)
+    setHerberekeningVoortgang(null)
+    load()
+  }
+
   const importRows = async () => {
     if (!preview?.length) return
     setImporting(true)
@@ -413,9 +495,17 @@ export default function Omzetrekeningen() {
           <div className="page-sub">{rows.length} regels</div>
         </div>
         {rows.length > 0 && (
-          <button className="btn btn-ghost" style={{ color: 'var(--danger)' }} onClick={removeAll}>
-            <Trash2 size={15} /> Alles verwijderen
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-secondary" onClick={herbereken} disabled={herberekening}>
+              <RefreshCw size={14} style={{ animation: herberekening ? 'spin 1s linear infinite' : undefined }} />
+              {herberekening && herberekeningVoortgang
+                ? `Herberekenen… ${herberekeningVoortgang.gedaan}/${herberekeningVoortgang.totaal}`
+                : 'Herbereken alles'}
+            </button>
+            <button className="btn btn-ghost" style={{ color: 'var(--danger)' }} onClick={removeAll}>
+              <Trash2 size={15} /> Alles verwijderen
+            </button>
+          </div>
         )}
       </div>
 

@@ -1,4 +1,5 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+@keyframes spin{to{transform:rotate(360deg)}}
 :root{--bg:#f7f5f0;--surface:#ffffff;--border:#e8e4dc;--border-md:#d4cfc4;--text:#1a1916;--muted:#7a756c;--accent:#1a6b3c;--accent-bg:#edf5f0;--danger:#c0392b;--danger-bg:#fdf2f1;--warning:#9a6700;--warning-bg:#fdf8ed;--radius:6px;--radius-lg:10px;font-family:'DM Sans',system-ui,sans-serif;font-size:14px;line-height:1.6;color:var(--text);background:var(--bg)}
 body{min-height:100vh}
 a{color:inherit;text-decoration:none}
