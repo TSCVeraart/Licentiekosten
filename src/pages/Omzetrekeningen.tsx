@@ -68,6 +68,13 @@ const fmt = (v: number | null) =>
 const fmtTarief = (v: number | null) =>
   v != null ? `€ ${v.toFixed(4)}` : '–'
 
+const DEFAULT_COL_WIDTHS: Record<string, number> = {
+  datum: 105, rekening: 80, omschrijving: 200, debet_eur: 110, credit_eur: 110,
+  vv_bedrag: 110, debiteur_nr: 80, debiteur_naam: 160, land_debiteur: 70,
+  soort: 90, artikel: 80, code_groep: 95, ras_naam: 140, licentiehouder_naam: 150,
+  licentiekosten: 90, totaal_licentiekosten: 110, intern_extern: 75, aantal: 80,
+}
+
 const COLS: { key: string; label: string; num?: boolean }[] = [
   { key: 'datum',              label: 'Datum' },
   { key: 'rekening',          label: 'Rekening' },
@@ -115,10 +122,16 @@ export default function Omzetrekeningen() {
   const [filterDatumTot, setFilterDatumTot] = useState('')
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [colWidths, setColWidths] = useState<Record<string, number>>(
+    () => JSON.parse(localStorage.getItem('omzet-col-widths') ?? 'null') ?? {}
+  )
   const wasDragged = useRef(false)
+  const isResizing = useRef(false)
+  const colGroupRef = useRef<HTMLTableColElement[]>([])
 
   const handleSort = (key: string) => {
     if (wasDragged.current) { wasDragged.current = false; return }
+    if (isResizing.current) return
     if (sortCol === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortCol(key); setSortDir('asc') }
   }
@@ -138,11 +151,39 @@ export default function Omzetrekeningen() {
     setDragOverKey(null)
   }
 
+  const onResizeMouseDown = (e: React.MouseEvent, key: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    isResizing.current = true
+    const colIdx = orderedCols.findIndex(c => c.key === key)
+    const colEl = colGroupRef.current[colIdx]
+    const startX = e.clientX
+    const startWidth = colWidths[key] ?? DEFAULT_COL_WIDTHS[key] ?? 100
+
+    const onMouseMove = (ev: MouseEvent) => {
+      const w = Math.max(60, startWidth + (ev.clientX - startX))
+      if (colEl) colEl.style.width = w + 'px'
+    }
+    const onMouseUp = (ev: MouseEvent) => {
+      const w = Math.max(60, startWidth + (ev.clientX - startX))
+      setColWidths(prev => {
+        const next = { ...prev, [key]: w }
+        localStorage.setItem('omzet-col-widths', JSON.stringify(next))
+        return next
+      })
+      setTimeout(() => { isResizing.current = false }, 0)
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }
+
   const renderCell = (r: Omzetrekening, key: string) => {
     switch (key) {
       case 'datum':              return <td key={key} className="mono" style={{ whiteSpace: 'nowrap' }}>{r.datum ?? '–'}</td>
       case 'rekening':           return <td key={key} className="mono text-muted" style={{ fontSize: 12 }}>{r.rekening ?? '–'}</td>
-      case 'omschrijving':       return <td key={key} style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.omschrijving ?? '–'}</td>
+      case 'omschrijving':       return <td key={key} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.omschrijving ?? '–'}</td>
       case 'debet_eur':          return <td key={key} className="num">{fmt(r.debet_eur)}</td>
       case 'credit_eur':         return <td key={key} className="num">{fmt(r.credit_eur)}</td>
       case 'vv_bedrag':          return <td key={key} className="num">{fmt(r.vv_bedrag)}</td>
@@ -457,7 +498,17 @@ export default function Omzetrekeningen() {
 
       <div className="card">
         <div className="table-wrap" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 340px)' }}>
-          <table>
+          <table style={{ tableLayout: 'fixed', width: 'max-content', minWidth: '100%' }}>
+            <colgroup>
+              {orderedCols.map((col, i) => (
+                <col
+                  key={col.key}
+                  ref={el => { if (el) colGroupRef.current[i] = el }}
+                  style={{ width: colWidths[col.key] ?? DEFAULT_COL_WIDTHS[col.key] ?? 100 }}
+                />
+              ))}
+              <col style={{ width: 40 }} />
+            </colgroup>
             <thead>
               <tr>
                 {orderedCols.map(col => (
@@ -474,15 +525,30 @@ export default function Omzetrekeningen() {
                       position: 'sticky', top: 0, zIndex: 1,
                       cursor: 'pointer',
                       opacity: dragKey === col.key ? 0.4 : 1,
-                      background: dragOverKey === col.key ? 'var(--accent-bg)' : undefined,
+                      background: dragOverKey === col.key ? 'var(--accent-bg)' : 'var(--surface)',
                       userSelect: 'none',
                       whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      paddingRight: 18,
+                      boxSizing: 'border-box',
                     }}
                   >
                     {col.label} {sortCol === col.key ? (sortDir === 'asc' ? '↑' : '↓') : <span style={{ opacity: 0.3 }}>↕</span>}
+                    <span
+                      onMouseDown={e => onResizeMouseDown(e, col.key)}
+                      onClick={e => e.stopPropagation()}
+                      style={{
+                        position: 'absolute', right: 0, top: 0, bottom: 0, width: 8,
+                        cursor: 'col-resize', zIndex: 2,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <span style={{ width: 2, height: '60%', background: 'var(--border-md)', borderRadius: 1, pointerEvents: 'none' }} />
+                    </span>
                   </th>
                 ))}
-                <th style={{ position: 'sticky', top: 0, zIndex: 1 }}></th>
+                <th style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--surface)' }}></th>
               </tr>
             </thead>
             <tbody>
