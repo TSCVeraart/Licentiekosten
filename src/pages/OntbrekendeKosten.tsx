@@ -340,18 +340,18 @@ export default function OntbrekendeKosten() {
                 <th style={{ position: 'sticky', top: 0, zIndex: 1, width: 40 }}>Kleur</th>
                 {([
                   ['datum',               'Datum'],
-                  ['debiteur_nr',         'Deb. nr'],
-                  ['debiteur_naam',       'Naam'],
-                  ['land_debiteur',       'Land'],
-                  ['intern_extern',       'Type'],
-                  ['soort',              'Soort'],
-                  ['rekening',           'Rekening'],
-                  ['artikel',            'Artikel'],
-                  ['code_groep',         'Code groep'],
-                  ['ras_naam',           'Ras'],
-                  ['licentiehouder_naam','Licentiehouder'],
-                  ['aantal',             'Aantal'],
-                  ['omschrijving',       'Omschrijving'],
+                  ['rekening',            'Rekening'],
+                  ['debiteur_nr',         'Debiteur'],
+                  ['land_debiteur',       'Country'],
+                  ['intern_extern',       'Intern / Extern'],
+                  ['debiteur_naam',       'Debiteur: Naam'],
+                  ['omschrijving',        'Artikelomschrijving'],
+                  ['soort',               'Soort'],
+                  ['ras_naam',            'Ras'],
+                  ['licentiehouder_naam', 'Licentiehouder'],
+                  ['artikel',             'Artikel'],
+                  ['code_groep',          'Artikelcode groep'],
+                  ['aantal',              'Aantal'],
                 ] as [string, string][]).map(([col, label]) => (
                   <th
                     key={col}
@@ -445,18 +445,18 @@ export default function OntbrekendeKosten() {
                     </td>
 
                     <td className="mono" style={{ whiteSpace: 'nowrap', fontSize: 12 }}>{r.datum ?? '–'}</td>
+                    <td className="mono text-muted" style={{ fontSize: 12 }}>{r.rekening ?? '–'}</td>
                     <td className="mono text-muted" style={{ fontSize: 12 }}>{r.debiteur_nr ?? '–'}</td>
-                    <td>{r.debiteur_naam ?? '–'}</td>
                     <td>{r.land_debiteur ?? <span className="text-muted">–</span>}</td>
                     <td>{r.intern_extern ?? <span className="text-muted">–</span>}</td>
+                    <td>{r.debiteur_naam ?? '–'}</td>
+                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--muted)' }}>{r.omschrijving ?? '–'}</td>
                     <td>{r.soort ? <span className={`badge badge-${r.soort.toLowerCase()}`}>{r.soort}</span> : <span className="text-muted">–</span>}</td>
-                    <td className="mono text-muted" style={{ fontSize: 12 }}>{r.rekening ?? '–'}</td>
-                    <td className="mono text-muted" style={{ fontSize: 12 }}>{r.artikel ?? '–'}</td>
-                    <td className="mono text-muted" style={{ fontSize: 12 }}>{r.code_groep ?? '–'}</td>
                     <td>{r.ras_naam ?? <span className="text-muted">–</span>}</td>
                     <td style={{ fontSize: 12, color: 'var(--muted)' }}>{r.licentiehouder_naam ?? '–'}</td>
+                    <td className="mono text-muted" style={{ fontSize: 12 }}>{r.artikel ?? '–'}</td>
+                    <td className="mono text-muted" style={{ fontSize: 12 }}>{r.code_groep ?? '–'}</td>
                     <td className="num">{r.aantal?.toLocaleString('nl-NL') ?? '–'}</td>
-                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, color: 'var(--muted)' }}>{r.omschrijving ?? '–'}</td>
                   </tr>
                 )
               })}
