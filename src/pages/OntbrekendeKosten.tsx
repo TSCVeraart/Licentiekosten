@@ -148,10 +148,12 @@ export default function OntbrekendeKosten() {
     const matchQ = !q ||
       (r.debiteur_naam ?? '').toLowerCase().includes(q) ||
       (r.omschrijving ?? '').toLowerCase().includes(q) ||
+      (r.artikel_omschrijving ?? '').toLowerCase().includes(q) ||
       (r.ras_naam ?? '').toLowerCase().includes(q) ||
       (r.licentiehouder_naam ?? '').toLowerCase().includes(q) ||
       String(r.debiteur_nr ?? '').includes(q) ||
-      (r.land_debiteur ?? '').toLowerCase().includes(q)
+      (r.land_debiteur ?? '').toLowerCase().includes(q) ||
+      (r.artikel != null ? String(r.artikel).includes(q) : false)
     const matchKleur = filterKleur === 'alle'
       ? true
       : filterKleur === 'geen'
