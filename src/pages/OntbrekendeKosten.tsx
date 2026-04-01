@@ -44,9 +44,20 @@ const loadLegenda = (): Record<string, string> =>
 export const getKleurHex = (kleurId: string) =>
   KLEUREN.find(k => k.id === kleurId)?.hex ?? '#94a3b8'
 
+const suggestKleur = (r: OmzetRij, landenMetTarief: Set<string>): string => {
+  if (r.intern_extern !== 'Extern') return 'groen'
+  if (r.land_debiteur === null || r.artikel === null) return 'rood'
+  if (r.code_groep === null) return 'codegroep'
+  if (r.ras_naam === null) return 'geel'
+  if (r.licentiehouder_naam === null) return 'lh'
+  if (!landenMetTarief.has(r.land_debiteur)) return 'landlicent'
+  return 'oranje'
+}
+
 export default function OntbrekendeKosten() {
   const [rows, setRows]             = useState<OmzetRij[]>([])
   const [loading, setLoading]       = useState(true)
+  const [landenMetTarief, setLandenMetTarief] = useState<Set<string>>(new Set())
   const [search,         setSearch]         = usePersistedState('f-ontb-search', '')
   const [filterKleur,    setFilterKleur]    = usePersistedState('f-ontb-kleur', 'alle')
   const [filterDebiteur, setFilterDebiteur] = usePersistedState<string[]>('f-ontb-debiteur', [])
@@ -84,6 +95,10 @@ export default function OntbrekendeKosten() {
         from += pageSize
       }
       setRows(all)
+
+      const { data: lkData } = await supabase.from('licentiekosten').select('land').not('tarief', 'is', null)
+      setLandenMetTarief(new Set((lkData ?? []).map((l: { land: string }) => l.land)))
+
       setLoading(false)
     }
     fetchAll()
@@ -222,6 +237,22 @@ export default function OntbrekendeKosten() {
           <div className="page-title">Ontbrekende licentiekosten</div>
           <div className="page-sub">{rows.length} regels zonder licentiekosten</div>
         </div>
+        <button className="btn btn-secondary" onClick={async () => {
+          const ongekleurd = rows.filter(r => !r.kleur)
+          if (!ongekleurd.length) { toast('Alle regels hebben al een kleur'); return }
+          const updates = ongekleurd.map(r => ({ id: r.id, kleur: suggestKleur(r, landenMetTarief) }))
+          setRows(prev => prev.map(r => {
+            const u = updates.find(u => u.id === r.id)
+            return u ? { ...r, kleur: u.kleur } : r
+          }))
+          for (let i = 0; i < updates.length; i += 100) {
+            const batch = updates.slice(i, i + 100)
+            await Promise.all(batch.map(u => supabase.from('omzetrekeningen').update({ kleur: u.kleur }).eq('id', u.id)))
+          }
+          toast.success(`${updates.length} regels geclassificeerd`)
+        }}>
+          Voorstel toepassen
+        </button>
         <button className="btn btn-ghost" onClick={() => exportCsv(
           `ontbrekende-kosten-${new Date().toISOString().slice(0,10)}.csv`,
           ['Datum','Rekening','Debiteur','Country','Intern / Extern','Debiteur: Naam','Artikelomschrijving','Soort','Ras','Licentiehouder','Artikel','Artikelcode groep','Aantal','Kleur'],
@@ -391,6 +422,8 @@ export default function OntbrekendeKosten() {
               {sortedFiltered.map(r => {
                 const kleurId = kleuren[r.id] ?? null
                 const hex = kleurId ? getKleurHex(kleurId) : null
+                const voorstel = suggestKleur(r, landenMetTarief)
+                const voorstelHex = getKleurHex(voorstel)
                 const isSelected = selected.has(r.id)
                 return (
                   <tr
@@ -419,12 +452,12 @@ export default function OntbrekendeKosten() {
                         onClick={() => setPopover(prev => prev === r.id ? null : r.id)}
                         style={{
                           width: 20, height: 20, borderRadius: '50%',
-                          background: hex ?? 'transparent',
-                          border: hex ? `2px solid ${hex}` : '2px dashed var(--muted)',
+                          background: hex ?? voorstelHex + '40',
+                          border: hex ? `2px solid ${hex}` : `2px dashed ${voorstelHex}`,
                           cursor: 'pointer',
                           display: 'inline-block', verticalAlign: 'middle',
                         }}
-                        title="Kleur instellen"
+                        title={kleurId ? getLabel(kleurId) : `Voorstel: ${getLabel(voorstel)}`}
                       />
                       {popover === r.id && (
                         <div
@@ -436,6 +469,25 @@ export default function OntbrekendeKosten() {
                             display: 'flex', flexDirection: 'column', gap: 6, minWidth: 220,
                           }}
                         >
+                          {!kleurId && (
+                            <>
+                              <div style={{ fontSize: 11, color: 'var(--muted)', padding: '2px 8px 4px', fontWeight: 500 }}>Voorstel</div>
+                              <button
+                                onClick={() => setKleur(r.id, voorstel)}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 8,
+                                  background: voorstelHex + '20',
+                                  border: `1px solid ${voorstelHex}`,
+                                  borderRadius: 6, padding: '5px 8px', cursor: 'pointer',
+                                  textAlign: 'left', width: '100%',
+                                }}
+                              >
+                                <span style={{ width: 14, height: 14, borderRadius: '50%', background: voorstelHex, flexShrink: 0 }} />
+                                <span style={{ fontSize: 12, color: 'var(--text)' }}>{getLabel(voorstel)}</span>
+                              </button>
+                              <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+                            </>
+                          )}
                           {KLEUREN.map(k => (
                             <button
                               key={k.id}
