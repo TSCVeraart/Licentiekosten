@@ -145,7 +145,7 @@ function DonutChart({ groups, totaal }: { groups: [string, { lk: number }][]; to
   )
 }
 
-type GroupBy = 'maand' | 'licentiehouder' | 'ras' | 'soort' | 'land' | 'type'
+type GroupBy = 'maand' | 'licentiehouder' | 'ras' | 'soort' | 'land' | 'type' | 'afloop'
 
 const GROUPS: { key: GroupBy; label: string }[] = [
   { key: 'maand',          label: 'Maand' },
@@ -154,6 +154,7 @@ const GROUPS: { key: GroupBy; label: string }[] = [
   { key: 'soort',          label: 'Soort' },
   { key: 'land',           label: 'Land' },
   { key: 'type',           label: 'Type' },
+  { key: 'afloop',         label: 'Afloop licentiehouders' },
 ]
 
 export default function Dashboard() {
@@ -210,6 +211,7 @@ export default function Dashboard() {
     if (groupBy === 'soort')          return r.soort ?? '–'
     if (groupBy === 'land')           return r.land_debiteur ?? '–'
     if (groupBy === 'type')           return r.intern_extern ?? '–'
+    if (groupBy === 'afloop')         return r.licentiehouder_naam ?? '–'
     return '–'
   }
   const groups = useMemo(() => {
@@ -325,8 +327,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Compacte visual */}
-        {!loading && groups.length > 0 && (
+        {/* Compacte visual — niet bij afloop */}
+        {!loading && groups.length > 0 && groupBy !== 'afloop' && (
           <div style={{ padding: '12px 20px 4px', borderBottom: '1px solid var(--border)' }}>
             {groupBy === 'maand' && activeSoorten.length > 0 && (
               <MaandChart data={maandChartData} soorten={activeSoorten} totaal={totLk} />
@@ -340,87 +342,90 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Tabel */}
-        <div className="table-wrap" style={{ maxHeight: 'calc(100vh - 420px)', overflowY: 'auto' }}>
-          <table>
-            <thead>
-              <tr>
-                <th>{GROUPS.find(g => g.key === groupBy)?.label}</th>
-                <th className="num">Planten</th>
-                <th className="num">Licentiekosten</th>
-                <th className="num">% van totaal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && <tr><td colSpan={4} className="empty">Laden…</td></tr>}
-              {!loading && groups.length === 0 && <tr><td colSpan={4} className="empty">Geen data — importeer eerst omzetrekeningen.</td></tr>}
-              {groups.map(([key, val]) => (
-                <tr key={key}>
-                  <td style={{ fontWeight: 500 }}>{key}</td>
-                  <td className="num">{fmtN(val.aantal)}</td>
-                  <td className="num">{fmt(val.lk)}</td>
-                  <td className="num" style={{ color: 'var(--muted)', fontSize: 12 }}>
-                    {totLk > 0 ? (val.lk / totLk * 100).toFixed(1) + '%' : '–'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            {groups.length > 1 && (
-              <tfoot>
-                <tr>
-                  <td>Totaal ({groups.length})</td>
-                  <td className="num">{fmtN(totAantal)}</td>
-                  <td className="num">{fmt(totLk)}</td>
-                  <td className="num">100%</td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-      </div>
-
-      {/* Pivot licentiehouder × maand — alleen zichtbaar onder tabblad Licentiehouder */}
-      {!loading && groupBy === 'licentiehouder' && pivotData.lhRows.length > 0 && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div style={{ padding: '14px 20px 10px', fontWeight: 600, fontSize: 13 }}>Licentiekosten per licentiehouder per maand</div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ fontSize: 12 }}>
+        {/* Groepeer tabel — niet bij afloop */}
+        {groupBy !== 'afloop' && (
+          <div className="table-wrap" style={{ maxHeight: 'calc(100vh - 420px)', overflowY: 'auto' }}>
+            <table>
               <thead>
                 <tr>
-                  <th style={{ position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 2, minWidth: 160, textAlign: 'left' }}>Licentiehouder</th>
-                  {pivotData.maanden.map(m => (
-                    <th key={m} className="num" style={{ whiteSpace: 'nowrap', minWidth: 90 }}>{fmtMaand(m)}</th>
-                  ))}
-                  <th className="num" style={{ whiteSpace: 'nowrap', minWidth: 100, fontWeight: 700 }}>Totaal</th>
+                  <th>{GROUPS.find(g => g.key === groupBy)?.label}</th>
+                  <th className="num">Planten</th>
+                  <th className="num">Licentiekosten</th>
+                  <th className="num">% van totaal</th>
                 </tr>
               </thead>
               <tbody>
-                {pivotData.lhRows.map(({ lh, totaal, data }) => (
-                  <tr key={lh}>
-                    <td style={{ position: 'sticky', left: 0, background: 'var(--surface)', fontWeight: 500, zIndex: 1 }}>{lh}</td>
-                    {pivotData.maanden.map(m => {
-                      const v = data.get(m) ?? null
-                      return <td key={m} className="num" style={{ color: v ? 'var(--text)' : 'var(--muted)' }}>{v != null ? fmt(v) : '–'}</td>
-                    })}
-                    <td className="num" style={{ fontWeight: 700 }}>{fmt(totaal)}</td>
+                {loading && <tr><td colSpan={4} className="empty">Laden…</td></tr>}
+                {!loading && groups.length === 0 && <tr><td colSpan={4} className="empty">Geen data — importeer eerst omzetrekeningen.</td></tr>}
+                {groups.map(([key, val]) => (
+                  <tr key={key}>
+                    <td style={{ fontWeight: 500 }}>{key}</td>
+                    <td className="num">{fmtN(val.aantal)}</td>
+                    <td className="num">{fmt(val.lk)}</td>
+                    <td className="num" style={{ color: 'var(--muted)', fontSize: 12 }}>
+                      {totLk > 0 ? (val.lk / totLk * 100).toFixed(1) + '%' : '–'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot>
-                <tr style={{ borderTop: '2px solid var(--border-md)' }}>
-                  <td style={{ position: 'sticky', left: 0, background: 'var(--surface)', fontWeight: 700, zIndex: 1 }}>Totaal</td>
-                  {pivotData.maanden.map(m => (
-                    <td key={m} className="num" style={{ fontWeight: 700 }}>
-                      {pivotData.maandTotalen.get(m) ? fmt(pivotData.maandTotalen.get(m)!) : '–'}
-                    </td>
-                  ))}
-                  <td className="num" style={{ fontWeight: 700 }}>{fmt(totLk)}</td>
-                </tr>
-              </tfoot>
+              {groups.length > 1 && (
+                <tfoot>
+                  <tr>
+                    <td>Totaal ({groups.length})</td>
+                    <td className="num">{fmtN(totAantal)}</td>
+                    <td className="num">{fmt(totLk)}</td>
+                    <td className="num">100%</td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Pivot afloop licentiehouders */}
+        {groupBy === 'afloop' && (
+          <div style={{ overflowX: 'auto' }}>
+            {loading && <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Laden…</div>}
+            {!loading && pivotData.lhRows.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Geen data — importeer eerst omzetrekeningen.</div>}
+            {!loading && pivotData.lhRows.length > 0 && (
+              <table style={{ fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 2, minWidth: 160, textAlign: 'left' }}>Licentiehouder</th>
+                    {pivotData.maanden.map(m => (
+                      <th key={m} className="num" style={{ whiteSpace: 'nowrap', minWidth: 90 }}>{fmtMaand(m)}</th>
+                    ))}
+                    <th className="num" style={{ whiteSpace: 'nowrap', minWidth: 100, fontWeight: 700 }}>Totaal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pivotData.lhRows.map(({ lh, totaal, data }) => (
+                    <tr key={lh}>
+                      <td style={{ position: 'sticky', left: 0, background: 'var(--surface)', fontWeight: 500, zIndex: 1 }}>{lh}</td>
+                      {pivotData.maanden.map(m => {
+                        const v = data.get(m) ?? null
+                        return <td key={m} className="num" style={{ color: v ? 'var(--text)' : 'var(--muted)' }}>{v != null ? fmt(v) : '–'}</td>
+                      })}
+                      <td className="num" style={{ fontWeight: 700 }}>{fmt(totaal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ borderTop: '2px solid var(--border-md)' }}>
+                    <td style={{ position: 'sticky', left: 0, background: 'var(--surface)', fontWeight: 700, zIndex: 1 }}>Totaal</td>
+                    {pivotData.maanden.map(m => (
+                      <td key={m} className="num" style={{ fontWeight: 700 }}>
+                        {pivotData.maandTotalen.get(m) ? fmt(pivotData.maandTotalen.get(m)!) : '–'}
+                      </td>
+                    ))}
+                    <td className="num" style={{ fontWeight: 700 }}>{fmt(totLk)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
     </>
   )
 }
