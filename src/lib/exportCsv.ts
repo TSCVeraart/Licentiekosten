@@ -1,4 +1,8 @@
 const esc = (v: unknown): string => {
+  if (typeof v === 'number') {
+    // Floating point afronden en komma als decimaalteken voor Dutch Excel
+    return parseFloat(v.toFixed(10)).toString().replace('.', ',')
+  }
   const s = v == null ? '' : String(v)
   return s.includes(';') || s.includes('"') || s.includes('\n')
     ? `"${s.replace(/"/g, '""')}"`
