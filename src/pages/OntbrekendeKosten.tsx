@@ -173,9 +173,14 @@ export default function OntbrekendeKosten() {
       const bv = (b as any)[sortCol] ?? -Infinity
       return sortDir === 'asc' ? (av > bv ? 1 : av < bv ? -1 : 0) : (av < bv ? 1 : av > bv ? -1 : 0)
     }
-    const av = ((a as any)[sortCol] ?? '').toString()
-    const bv = ((b as any)[sortCol] ?? '').toString()
-    return sortDir === 'asc' ? av.localeCompare(bv, 'nl', { sensitivity: 'base' }) : bv.localeCompare(av, 'nl', { sensitivity: 'base' })
+    const av: string | null = (a as any)[sortCol] ?? null
+    const bv: string | null = (b as any)[sortCol] ?? null
+    if (av === null && bv === null) return 0
+    if (av === null) return 1
+    if (bv === null) return -1
+    return sortDir === 'asc'
+      ? av.localeCompare(bv, 'nl', { sensitivity: 'base', numeric: true })
+      : bv.localeCompare(av, 'nl', { sensitivity: 'base', numeric: true })
   }) : filtered
 
   const allFilteredSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id))
