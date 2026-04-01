@@ -168,9 +168,14 @@ export default function OntbrekendeKosten() {
 
   const sortedFiltered = sortCol ? [...filtered].sort((a, b) => {
     const numCols = ['debiteur_nr', 'artikel', 'code_groep', 'aantal']
-    const av = numCols.includes(sortCol) ? ((a as any)[sortCol] ?? -Infinity) : ((a as any)[sortCol] ?? '').toString().toLowerCase()
-    const bv = numCols.includes(sortCol) ? ((b as any)[sortCol] ?? -Infinity) : ((b as any)[sortCol] ?? '').toString().toLowerCase()
-    return sortDir === 'asc' ? (av > bv ? 1 : av < bv ? -1 : 0) : (av < bv ? 1 : av > bv ? -1 : 0)
+    if (numCols.includes(sortCol)) {
+      const av = (a as any)[sortCol] ?? -Infinity
+      const bv = (b as any)[sortCol] ?? -Infinity
+      return sortDir === 'asc' ? (av > bv ? 1 : av < bv ? -1 : 0) : (av < bv ? 1 : av > bv ? -1 : 0)
+    }
+    const av = ((a as any)[sortCol] ?? '').toString()
+    const bv = ((b as any)[sortCol] ?? '').toString()
+    return sortDir === 'asc' ? av.localeCompare(bv, 'nl', { sensitivity: 'base' }) : bv.localeCompare(av, 'nl', { sensitivity: 'base' })
   }) : filtered
 
   const allFilteredSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id))

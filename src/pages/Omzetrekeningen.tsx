@@ -511,9 +511,14 @@ export default function Omzetrekeningen() {
   }).sort((a, b) => {
     if (!sortCol) return 0
     const numCols = ['debet_eur','credit_eur','vv_bedrag','aantal','licentiekosten','totaal_licentiekosten','debiteur_nr','artikel','code_groep']
-    const av = numCols.includes(sortCol) ? ((a as any)[sortCol] ?? -Infinity) : ((a as any)[sortCol] ?? '').toString().toLowerCase()
-    const bv = numCols.includes(sortCol) ? ((b as any)[sortCol] ?? -Infinity) : ((b as any)[sortCol] ?? '').toString().toLowerCase()
-    return sortDir === 'asc' ? (av > bv ? 1 : av < bv ? -1 : 0) : (av < bv ? 1 : av > bv ? -1 : 0)
+    if (numCols.includes(sortCol)) {
+      const av = (a as any)[sortCol] ?? -Infinity
+      const bv = (b as any)[sortCol] ?? -Infinity
+      return sortDir === 'asc' ? (av > bv ? 1 : av < bv ? -1 : 0) : (av < bv ? 1 : av > bv ? -1 : 0)
+    }
+    const av = ((a as any)[sortCol] ?? '').toString()
+    const bv = ((b as any)[sortCol] ?? '').toString()
+    return sortDir === 'asc' ? av.localeCompare(bv, 'nl', { sensitivity: 'base' }) : bv.localeCompare(av, 'nl', { sensitivity: 'base' })
   })
 
   const totaalLk = filtered.reduce((s, r) => s + (r.totaal_licentiekosten ?? 0), 0)
