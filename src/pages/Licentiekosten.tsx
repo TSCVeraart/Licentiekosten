@@ -14,8 +14,9 @@ export default function Licentiekosten() {
   const [rassen, setRassen] = useState<RasDetail[]>([])
   const [tarieven, setTarieven] = useState<Record<string, number | null>>({})
   const [loading, setLoading] = useState(true)
-  const [collapsed, setCollapsed] = useState<Set<number>>(() => {
-    try { const s = localStorage.getItem('lk_collapsed_ras'); return s ? new Set(JSON.parse(s)) : new Set() } catch { return new Set() }
+  // expanded bijhouden (niet collapsed) — default leeg = alles dicht
+  const [expanded, setExpanded] = useState<Set<number>>(() => {
+    try { const s = localStorage.getItem('lk_expanded_ras'); return s ? new Set(JSON.parse(s)) : new Set() } catch { return new Set() }
   })
   const [search,             setSearch]             = usePersistedState('f-lk-search', '')
   const [filterNietIngevuld, setFilterNietIngevuld] = usePersistedState('f-lk-niet-ingevuld', false)
@@ -28,10 +29,10 @@ export default function Licentiekosten() {
   const savingRef = useRef(false)
 
   const toggleCollapse = (key: number) =>
-    setCollapsed(prev => {
+    setExpanded(prev => {
       const next = new Set(prev)
       next.has(key) ? next.delete(key) : next.add(key)
-      localStorage.setItem('lk_collapsed_ras', JSON.stringify([...next]))
+      localStorage.setItem('lk_expanded_ras', JSON.stringify([...next]))
       return next
     })
 
@@ -184,9 +185,8 @@ export default function Licentiekosten() {
             <Download size={14} /> Exporteren
           </button>
           <button className="btn btn-secondary" onClick={() => {
-            const next = new Set(rasGroepen.map(g => g.rasId))
-            setCollapsed(next)
-            localStorage.setItem('lk_collapsed_ras', JSON.stringify([...next]))
+            setExpanded(new Set())
+            localStorage.setItem('lk_expanded_ras', JSON.stringify([]))
           }}>Alles dichtklappen</button>
         </div>
       </div>
@@ -217,7 +217,7 @@ export default function Licentiekosten() {
 
         {/* Gekoppelde rassen — matrix per ras */}
         {rasGroepen.map(({ rasId, cgs, ras }) => {
-          const isCollapsed = collapsed.has(rasId)
+          const isCollapsed = !expanded.has(rasId)
           const landen = ras.landen
           const allFilled = cgs.every(cg => landen.every(l => tarieven[`${cg.code_groep}_${l}`] != null))
 
@@ -328,13 +328,13 @@ export default function Licentiekosten() {
           <div className="card">
             <div
               onClick={() => toggleCollapse(0)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', cursor: 'pointer', userSelect: 'none', borderBottom: collapsed.has(0) ? undefined : '1px solid var(--border)' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', cursor: 'pointer', userSelect: 'none', borderBottom: expanded.has(0) ? '1px solid var(--border)' : undefined }}
             >
-              {collapsed.has(0) ? <ChevronRight size={15} color="var(--muted)" /> : <ChevronDown size={15} color="var(--muted)" />}
+              {expanded.has(0) ? <ChevronDown size={15} color="var(--muted)" /> : <ChevronRight size={15} color="var(--muted)" />}
               <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--muted)' }}>Niet gekoppeld aan ras</span>
               <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)' }}>{ungrouped.length} code{ungrouped.length !== 1 ? 's' : ''}</span>
             </div>
-            {!collapsed.has(0) && (
+            {expanded.has(0) && (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ fontSize: 12 }}>
                   <thead>
