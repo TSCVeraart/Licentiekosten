@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, Leaf, Package, TrendingUp, Tag, Euro, AlertCircle, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, Users, Leaf, Package, TrendingUp, Tag, Euro, AlertCircle, ClipboardList, LogOut } from 'lucide-react'
+import { type Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
+import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Debiteuren from './pages/Debiteuren'
 import Licentiehouders from './pages/Licentiehouders'
@@ -89,6 +91,21 @@ function useOntbrekendBadge() {
 }
 
 export default function App() {
+  const [session, setSession] = useState<Session | null | undefined>(undefined)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session))
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (session === undefined) return null
+  if (session === null) return <Login />
+
+  return <AppInner />
+}
+
+function AppInner() {
   const ontbrekendCount = useOntbrekendBadge()
   const debiteurenCount = useDebiteurenBadge()
   const checklistOpen   = useChecklistBadge()
@@ -162,6 +179,13 @@ export default function App() {
           </NavLink>
           <NavLink to="/licentiekosten" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Euro />Licentiekosten</NavLink>
         </nav>
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className="nav-link"
+          style={{ width: '100%', textAlign: 'left', marginTop: 'auto', borderTop: '1px solid var(--border)', borderRadius: 0, color: 'var(--muted)' }}
+        >
+          <LogOut size={16} /> Uitloggen
+        </button>
       </aside>
       <main className="main">
         <div className="page">
