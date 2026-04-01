@@ -499,7 +499,7 @@ export default function Omzetrekeningen() {
   const filtered = rows.filter(r => {
     const q = search.toLowerCase()
     return (
-      (!q || (r.debiteur_naam ?? '').toLowerCase().includes(q) || (r.omschrijving ?? '').toLowerCase().includes(q) || (r.rekening ?? '').includes(q) || (r.ras_naam ?? '').toLowerCase().includes(q) || (r.licentiehouder_naam ?? '').toLowerCase().includes(q) || String(r.debiteur_nr ?? '').includes(q)) &&
+      (!q || (r.debiteur_naam ?? '').toLowerCase().includes(q) || (r.omschrijving ?? '').toLowerCase().includes(q) || (r.artikel_omschrijving ?? '').toLowerCase().includes(q) || (r.rekening ?? '').includes(q) || (r.ras_naam ?? '').toLowerCase().includes(q) || (r.licentiehouder_naam ?? '').toLowerCase().includes(q) || String(r.debiteur_nr ?? '').includes(q) || (r.artikel ?? '').toString().toLowerCase().includes(q)) &&
       (!filterSoort.length || filterSoort.includes(r.soort ?? '')) &&
       (!filterLand.length  || filterLand.includes(r.land_debiteur ?? '')) &&
       (!filterRas.length   || filterRas.includes(r.ras_naam ?? '')) &&
