@@ -254,7 +254,8 @@ export default function Omzetrekeningen() {
     let all: Omzetrekening[] = []
     let from = 0
     while (true) {
-      const { data } = await supabase.from('omzetrekeningen').select('*').order('datum', { ascending: false }).range(from, from + pageSize - 1)
+      const { data, error } = await supabase.from('omzetrekeningen').select('*').order('datum', { ascending: false }).range(from, from + pageSize - 1)
+      if (error) { toast.error(`Fout bij laden: ${error.message}`); break }
       if (!data?.length) break
       all = [...all, ...data as Omzetrekening[]]
       if (data.length < pageSize) break
