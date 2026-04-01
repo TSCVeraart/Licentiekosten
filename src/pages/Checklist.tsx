@@ -62,7 +62,6 @@ export default function Checklist() {
   const [loading, setLoading] = useState(true)
   const debounceRefs = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
-  const isVroeg = new Date().getDate() < 10
 
   const load = async (m: string) => {
     setLoading(true)
@@ -112,7 +111,7 @@ export default function Checklist() {
           <div className="page-title">Maandchecklist</div>
           <div className="page-sub">{afgevinkt} / {ALL_ITEMS.length} afgevinkt</div>
         </div>
-        {allDone && !isVroeg && (
+        {allDone && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '8px 14px', borderRadius: 'var(--radius)',
@@ -131,12 +130,7 @@ export default function Checklist() {
         <button className="btn btn-ghost" onClick={() => setMaand(m => addMonths(m, 1))}><ChevronRight size={16} /></button>
       </div>
 
-      {isVroeg ? (
-        <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-          De checklist is beschikbaar vanaf de 10e van de maand.
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {loading && <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Laden…</div>}
           {!loading && GROEPEN.map(groep => {
             const gedaan = groep.items.filter(i => data[i.id]?.afgevinkt).length
@@ -210,7 +204,6 @@ export default function Checklist() {
             )
           })}
         </div>
-      )}
     </>
   )
 }
