@@ -123,6 +123,7 @@ export default function App() {
           </NavLink>
           <NavLink to="/licentiehouders" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Leaf />Licentiehouders</NavLink>
           <NavLink to="/rassen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Package />Rassen</NavLink>
+          <NavLink to="/artikelen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Tag />Artikelen</NavLink>
           <div className="nav-section">Boekingen</div>
 <NavLink to="/omzetrekeningen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><TrendingUp />Omzetrekeningen</NavLink>
           <NavLink to="/ontbrekende-kosten" className={({isActive}) => `nav-link ${isActive?'active':''}`}>
@@ -145,7 +146,6 @@ export default function App() {
               </span>
             )}
           </NavLink>
-          <NavLink to="/artikelen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Tag />Artikelen</NavLink>
           <div className="nav-section">Beheer</div>
           <NavLink to="/checklist" className={({isActive}) => `nav-link ${isActive?'active':''}`}>
             <ClipboardList />

@@ -15,7 +15,7 @@ export default function Licentiekosten() {
   const [tarieven, setTarieven] = useState<Record<string, number | null>>({})
   const [loading, setLoading] = useState(true)
   const [collapsed, setCollapsed] = useState<Set<number>>(() => {
-    try { const s = localStorage.getItem('lk_collapsed'); return s ? new Set(JSON.parse(s)) : new Set() } catch { return new Set() }
+    try { const s = localStorage.getItem('lk_collapsed_ras'); return s ? new Set(JSON.parse(s)) : new Set() } catch { return new Set() }
   })
   const [search,             setSearch]             = usePersistedState('f-lk-search', '')
   const [filterNietIngevuld, setFilterNietIngevuld] = usePersistedState('f-lk-niet-ingevuld', false)
@@ -27,11 +27,11 @@ export default function Licentiekosten() {
   const [editVal, setEditVal] = useState('')
   const savingRef = useRef(false)
 
-  const toggleCollapse = (code_groep: number) =>
+  const toggleCollapse = (key: number) =>
     setCollapsed(prev => {
       const next = new Set(prev)
-      next.has(code_groep) ? next.delete(code_groep) : next.add(code_groep)
-      localStorage.setItem('lk_collapsed', JSON.stringify([...next]))
+      next.has(key) ? next.delete(key) : next.add(key)
+      localStorage.setItem('lk_collapsed_ras', JSON.stringify([...next]))
       return next
     })
 
@@ -58,7 +58,6 @@ export default function Licentiekosten() {
       fetchAllLk(),
     ])
 
-    // Distinct code_groepen sorted
     const seen = new Set<number>()
     const cg: CodeGroep[] = []
     for (const row of (ak ?? []) as { code_groep: number; omschrijving: string | null }[]) {
@@ -67,12 +66,10 @@ export default function Licentiekosten() {
     cg.sort((a, b) => a.code_groep - b.code_groep)
     setCodeGroepen(cg)
 
-    // Ras config map
     const cfgMap: Record<number, number | null> = {}
     for (const c of (cgc ?? []) as { code_groep: number; ras_id: number | null }[]) cfgMap[c.code_groep] = c.ras_id
     setRasConfigs(cfgMap)
 
-    // Rassen with licentiehouder and landen
     const lhMap: Record<number, string> = {}
     for (const l of (lh ?? []) as Licentiehouder[]) lhMap[l.id] = l.naam
     setRassen(((r ?? []) as any[]).map(ras => ({
@@ -81,13 +78,11 @@ export default function Licentiekosten() {
       landen: (ras.ras_landen ?? []).map((l: any) => l.land).sort(),
     })))
 
-    // Tarieven map — neem per (code_groep, land) de eerste gevonden waarde
     const tkMap: Record<string, number | null> = {}
     for (const t of lk)
       if (!((`${t.code_groep}_${t.land}`) in tkMap))
         tkMap[`${t.code_groep}_${t.land}`] = t.tarief
     setTarieven(tkMap)
-
     setLoading(false)
   }
   useEffect(() => { load() }, [])
@@ -101,7 +96,7 @@ export default function Licentiekosten() {
   }
 
   const saveTarief = async (code_groep: number, land: string, val: string) => {
-    if (savingRef.current) return   // voorkom dubbele aanroep via onBlur+Enter
+    if (savingRef.current) return
     savingRef.current = true
     const tarief = val.trim() ? parseFloat(val.replace(',', '.')) : null
     setTarieven(prev => ({ ...prev, [`${code_groep}_${land}`]: tarief }))
@@ -122,15 +117,45 @@ export default function Licentiekosten() {
     if (delErr) { toast.error('Fout bij opslaan: ' + delErr.message); return }
     const { error: insErr } = await supabase.from('licentiekosten').insert(landen.map(land => ({ code_groep, land, tarief })))
     if (insErr) { toast.error('Fout bij opslaan: ' + insErr.message); return }
-    setTarieven(prev => {
-      const next = { ...prev }
-      for (const land of landen) next[`${code_groep}_${land}`] = tarief
-      return next
-    })
+    setTarieven(prev => { const next = { ...prev }; for (const land of landen) next[`${code_groep}_${land}`] = tarief; return next })
+    setBulkVal(prev => { const next = { ...prev }; delete next[code_groep]; return next })
     toast.success('Tarief toegepast')
   }
 
   if (loading) return <div className="empty">Laden…</div>
+
+  const filteredCg = codeGroepen.filter(cg => {
+    const rasId = rasConfigs[cg.code_groep] ?? null
+    const ras = rassen.find(r => r.id === rasId) ?? null
+    return (
+      (!search || cg.code_groep.toString().includes(search) || (cg.omschrijving ?? '').toLowerCase().includes(search.toLowerCase())) &&
+      (!filterNietIngevuld || !rasId) &&
+      (!filterRas || ras?.naam === filterRas) &&
+      (!filterLh || ras?.lh_naam === filterLh) &&
+      (!filterSoort || ras?.soort === filterSoort)
+    )
+  })
+
+  // Groepeer per ras
+  const byRas = new Map<number, CodeGroep[]>()
+  const ungrouped: CodeGroep[] = []
+  for (const cg of filteredCg) {
+    const rasId = rasConfigs[cg.code_groep] ?? null
+    if (rasId != null) {
+      if (!byRas.has(rasId)) byRas.set(rasId, [])
+      byRas.get(rasId)!.push(cg)
+    } else {
+      ungrouped.push(cg)
+    }
+  }
+
+  // Sorteer rassen op naam
+  const rasGroepen = [...byRas.entries()]
+    .map(([rasId, cgs]) => ({ rasId, cgs, ras: rassen.find(r => r.id === rasId)! }))
+    .filter(g => g.ras)
+    .sort((a, b) => a.ras.naam.localeCompare(b.ras.naam, 'nl'))
+
+  const linkedRassen = rassen.filter(r => Object.values(rasConfigs).includes(r.id))
 
   return (
     <>
@@ -140,47 +165,40 @@ export default function Licentiekosten() {
           <div className="page-sub">{codeGroepen.length} artikelcode groepen</div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div className="search-wrap" style={{ width: 260 }}>
+          <div className="search-wrap" style={{ width: 240 }}>
             <Search className="search-icon" />
-            <input placeholder="Zoek op code of omschrijving…" value={search} onChange={e => setSearch(e.target.value)} />
+            <input placeholder="Zoek code of omschrijving…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <button
-            className={`btn ${filterNietIngevuld ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setFilterNietIngevuld(f => !f)}
-          >Niet ingevuld</button>
+          <button className={`btn ${filterNietIngevuld ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilterNietIngevuld(f => !f)}>
+            Niet ingevuld
+          </button>
           <button className="btn btn-ghost" onClick={() => {
             const exportRows: unknown[][] = []
             for (const cg of codeGroepen) {
               const ras = rassen.find(r => r.id === (rasConfigs[cg.code_groep] ?? null))
-              for (const land of (ras?.landen ?? [])) {
+              for (const land of (ras?.landen ?? []))
                 exportRows.push([cg.code_groep, cg.omschrijving, ras?.naam ?? '', land, tarieven[`${cg.code_groep}_${land}`] ?? ''])
-              }
             }
-            exportCsv(`licentiekosten-${new Date().toISOString().slice(0,10)}.csv`,
-              ['Code groep','Omschrijving','Ras','Land','Tarief'], exportRows)
+            exportCsv(`licentiekosten-${new Date().toISOString().slice(0,10)}.csv`, ['Code groep','Omschrijving','Ras','Land','Tarief'], exportRows)
           }}>
             <Download size={14} /> Exporteren
           </button>
           <button className="btn btn-secondary" onClick={() => {
-            const next = new Set(codeGroepen.map(cg => cg.code_groep))
+            const next = new Set(rasGroepen.map(g => g.rasId))
             setCollapsed(next)
-            localStorage.setItem('lk_collapsed', JSON.stringify([...next]))
+            localStorage.setItem('lk_collapsed_ras', JSON.stringify([...next]))
           }}>Alles dichtklappen</button>
         </div>
       </div>
 
-      {codeGroepen.length === 0 && (
-        <div className="card"><div className="empty">Geen artikelcode groepen gevonden — importeer eerst artikelen.</div></div>
-      )}
-
       <div className="filters">
         <select value={filterRas} onChange={e => setFilterRas(e.target.value)}>
           <option value="">Alle rassen</option>
-          {[...new Set(rassen.filter(r => Object.values(rasConfigs).includes(r.id)).map(r => r.naam))].sort().map(n => <option key={n} value={n}>{n}</option>)}
+          {[...new Set(linkedRassen.map(r => r.naam))].sort().map(n => <option key={n}>{n}</option>)}
         </select>
         <select value={filterLh} onChange={e => setFilterLh(e.target.value)}>
           <option value="">Alle licentiehouders</option>
-          {[...new Set(rassen.filter(r => Object.values(rasConfigs).includes(r.id)).map(r => r.lh_naam))].sort().map(n => <option key={n} value={n}>{n}</option>)}
+          {[...new Set(linkedRassen.map(r => r.lh_naam))].sort().map(n => <option key={n}>{n}</option>)}
         </select>
         <select value={filterSoort} onChange={e => setFilterSoort(e.target.value)}>
           <option value="">Alle soorten</option>
@@ -191,122 +209,164 @@ export default function Licentiekosten() {
         )}
       </div>
 
+      {codeGroepen.length === 0 && (
+        <div className="card"><div className="empty">Geen artikelcode groepen gevonden — importeer eerst artikelen.</div></div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {codeGroepen.filter(cg => {
-          const rasId = rasConfigs[cg.code_groep] ?? null
-          const ras = rassen.find(r => r.id === rasId) ?? null
-          return (
-            (!search || cg.code_groep.toString().includes(search) || cg.omschrijving?.toLowerCase().includes(search.toLowerCase())) &&
-            (!filterNietIngevuld || !rasId) &&
-            (!filterRas || ras?.naam === filterRas) &&
-            (!filterLh || ras?.lh_naam === filterLh) &&
-            (!filterSoort || ras?.soort === filterSoort)
-          )
-        }).map(cg => {
-          const rasId = rasConfigs[cg.code_groep] ?? null
-          const ras = rassen.find(r => r.id === rasId) ?? null
-          const landen = ras?.landen ?? []
-          const isCollapsed = collapsed.has(cg.code_groep)
+
+        {/* Gekoppelde rassen — matrix per ras */}
+        {rasGroepen.map(({ rasId, cgs, ras }) => {
+          const isCollapsed = collapsed.has(rasId)
+          const landen = ras.landen
+          const allFilled = cgs.every(cg => landen.every(l => tarieven[`${cg.code_groep}_${l}`] != null))
 
           return (
-            <div key={cg.code_groep} className="card">
+            <div key={rasId} className="card">
               {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', flexWrap: 'wrap', borderBottom: ras && !isCollapsed ? '1px solid var(--border)' : undefined }}>
-                <span onClick={() => toggleCollapse(cg.code_groep)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {isCollapsed ? <ChevronRight size={15} color="var(--muted)" /> : <ChevronDown size={15} color="var(--muted)" />}
-                  <span className="mono" style={{ fontSize: 14, fontWeight: 600 }}>{cg.code_groep}</span>
+              <div
+                onClick={() => toggleCollapse(rasId)}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', cursor: 'pointer', userSelect: 'none', borderBottom: isCollapsed ? undefined : '1px solid var(--border)' }}
+              >
+                {isCollapsed ? <ChevronRight size={15} color="var(--muted)" /> : <ChevronDown size={15} color="var(--muted)" />}
+                <span style={{ fontWeight: 600, fontSize: 13 }}>{ras.naam}</span>
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>{ras.lh_naam}</span>
+                <span className={`badge badge-${ras.soort.toLowerCase()}`} style={{ marginLeft: 2 }}>{ras.soort}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)' }}>
+                  {cgs.length} code{cgs.length !== 1 ? 's' : ''} · {landen.length} land{landen.length !== 1 ? 'en' : ''}
+                  {allFilled && <span style={{ marginLeft: 8, color: '#16a34a', fontWeight: 500 }}>✓ volledig</span>}
                 </span>
-                <span style={{ flex: 1, fontSize: 13 }}>{cg.omschrijving ?? '–'}</span>
-                <select
-                  value={rasId ?? ''}
-                  onChange={e => saveRasLink(cg.code_groep, e.target.value ? Number(e.target.value) : null)}
-                  style={{ width: 'auto', minWidth: 160, fontSize: 12, padding: '4px 8px' }}
-                >
-                  <option value="">— Koppel ras —</option>
-                  {rassen.map(r => <option key={r.id} value={r.id}>{r.naam} · {r.lh_naam}</option>)}
-                </select>
-                {ras && (
-                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>{ras.lh_naam}</span>
-                )}
               </div>
 
-              {/* Landen & tarieven */}
-              {ras && landen.length > 0 && !isCollapsed && (
-                <div style={{ padding: '10px 16px' }}>
-                  {/* Snel invullen */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>Snel invullen:</span>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      placeholder="0.0350"
-                      value={bulkVal[cg.code_groep] ?? ''}
-                      onChange={e => setBulkVal(prev => ({ ...prev, [cg.code_groep]: e.target.value }))}
-                      onKeyDown={e => { if (e.key === 'Enter') applyBulk(cg.code_groep, landen) }}
-                      style={{ width: 110, fontSize: 12, padding: '4px 8px' }}
-                    />
-                    <button
-                      className="btn btn-secondary"
-                      style={{ fontSize: 12, padding: '4px 10px' }}
-                      onClick={() => applyBulk(cg.code_groep, landen)}
-                    >
-                      <Check size={12} /> Alle landen
-                    </button>
-                  </div>
-
-                  {/* Landen */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {landen.map(land => {
-                      const key = `${cg.code_groep}_${land}`
-                      const tarief = tarieven[key]
-                      const isEditing = editingKey === key
-                      return (
-                        <div
-                          key={land}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 6,
-                            background: tarief != null ? 'var(--accent-bg)' : 'var(--bg)',
-                            border: `1px solid ${tarief != null ? 'var(--accent)' : 'var(--border)'}`,
-                            borderRadius: 6, padding: '4px 8px', minWidth: 120,
-                          }}
-                        >
-                          <span style={{ fontSize: 12, fontWeight: 600, minWidth: 24, color: tarief != null ? 'var(--accent)' : 'var(--muted)' }}>{land}</span>
-                          {isEditing
-                            ? <input
-                                type="number"
-                                step="0.0001"
-                                value={editVal}
-                                autoFocus
-                                onChange={e => setEditVal(e.target.value)}
-                                onBlur={() => saveTarief(cg.code_groep, land, editVal)}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') saveTarief(cg.code_groep, land, editVal)
-                                  if (e.key === 'Escape') setEditingKey(null)
-                                }}
-                                style={{ width: 75, fontSize: 12, padding: '2px 4px' }}
-                              />
-                            : <span
-                                onClick={() => { setEditingKey(key); setEditVal(tarief != null ? String(tarief) : '') }}
-                                style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", cursor: 'pointer', color: tarief != null ? 'var(--text)' : 'var(--muted)' }}
-                              >
-                                {tarief != null ? `€ ${tarief.toFixed(4)}` : 'klik…'}
-                              </span>
-                          }
-                        </div>
-                      )
-                    })}
-                  </div>
+              {/* Matrix */}
+              {!isCollapsed && landen.length > 0 && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ fontSize: 12 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ minWidth: 80 }}>Code</th>
+                        <th style={{ minWidth: 180 }}>Omschrijving</th>
+                        {landen.map(land => (
+                          <th key={land} className="num" style={{ minWidth: 90, whiteSpace: 'nowrap' }}>{land}</th>
+                        ))}
+                        <th style={{ minWidth: 150, color: 'var(--muted)', fontWeight: 400 }}>Snel invullen</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cgs.map(cg => {
+                        const rowFilled = landen.every(l => tarieven[`${cg.code_groep}_${l}`] != null)
+                        return (
+                          <tr key={cg.code_groep} style={{ background: rowFilled ? '#f0fdf420' : undefined }}>
+                            <td className="mono" style={{ fontWeight: 600, color: 'var(--muted)' }}>{cg.code_groep}</td>
+                            <td>{cg.omschrijving ?? '–'}</td>
+                            {landen.map(land => {
+                              const key = `${cg.code_groep}_${land}`
+                              const tarief = tarieven[key]
+                              const isEditing = editingKey === key
+                              return (
+                                <td key={land} className="num">
+                                  {isEditing
+                                    ? <input
+                                        type="number" step="0.0001" value={editVal} autoFocus
+                                        onChange={e => setEditVal(e.target.value)}
+                                        onBlur={() => saveTarief(cg.code_groep, land, editVal)}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter') saveTarief(cg.code_groep, land, editVal)
+                                          if (e.key === 'Escape') setEditingKey(null)
+                                        }}
+                                        style={{ width: 72, fontSize: 12, padding: '2px 4px', textAlign: 'right' }}
+                                      />
+                                    : <span
+                                        onClick={() => { setEditingKey(key); setEditVal(tarief != null ? String(tarief) : '') }}
+                                        style={{ cursor: 'pointer', color: tarief != null ? 'var(--text)' : 'var(--muted)', fontFamily: "'DM Mono', monospace" }}
+                                        title="Klik om te bewerken"
+                                      >
+                                        {tarief != null ? `€\u00a0${tarief.toFixed(4)}` : '–'}
+                                      </span>
+                                  }
+                                </td>
+                              )
+                            })}
+                            <td>
+                              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                <input
+                                  type="number" step="0.0001" placeholder="0.0000"
+                                  value={bulkVal[cg.code_groep] ?? ''}
+                                  onChange={e => setBulkVal(prev => ({ ...prev, [cg.code_groep]: e.target.value }))}
+                                  onKeyDown={e => { if (e.key === 'Enter') applyBulk(cg.code_groep, landen) }}
+                                  style={{ width: 80, fontSize: 12, padding: '3px 6px' }}
+                                />
+                                <button
+                                  className="btn btn-secondary"
+                                  style={{ fontSize: 11, padding: '3px 8px' }}
+                                  onClick={() => applyBulk(cg.code_groep, landen)}
+                                  title="Alle landen"
+                                >
+                                  <Check size={11} /> Alle
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
-              {ras && landen.length === 0 && !isCollapsed && (
+              {!isCollapsed && landen.length === 0 && (
                 <div style={{ padding: '10px 16px', fontSize: 12, color: 'var(--muted)' }}>
-                  Geen landen gekoppeld aan dit ras
+                  Geen landen gekoppeld aan dit ras — configureer landen via Rassen.
                 </div>
               )}
             </div>
           )
         })}
+
+        {/* Niet-gekoppelde code groepen */}
+        {ungrouped.length > 0 && (
+          <div className="card">
+            <div
+              onClick={() => toggleCollapse(0)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px', cursor: 'pointer', userSelect: 'none', borderBottom: collapsed.has(0) ? undefined : '1px solid var(--border)' }}
+            >
+              {collapsed.has(0) ? <ChevronRight size={15} color="var(--muted)" /> : <ChevronDown size={15} color="var(--muted)" />}
+              <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--muted)' }}>Niet gekoppeld aan ras</span>
+              <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)' }}>{ungrouped.length} code{ungrouped.length !== 1 ? 's' : ''}</span>
+            </div>
+            {!collapsed.has(0) && (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ minWidth: 80 }}>Code</th>
+                      <th style={{ minWidth: 200 }}>Omschrijving</th>
+                      <th style={{ minWidth: 200 }}>Koppel ras</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ungrouped.map(cg => (
+                      <tr key={cg.code_groep}>
+                        <td className="mono" style={{ fontWeight: 600, color: 'var(--muted)' }}>{cg.code_groep}</td>
+                        <td>{cg.omschrijving ?? '–'}</td>
+                        <td>
+                          <select
+                            value={rasConfigs[cg.code_groep] ?? ''}
+                            onChange={e => saveRasLink(cg.code_groep, e.target.value ? Number(e.target.value) : null)}
+                            style={{ width: 'auto', minWidth: 180, fontSize: 12, padding: '4px 8px' }}
+                          >
+                            <option value="">— Koppel ras —</option>
+                            {rassen.map(r => <option key={r.id} value={r.id}>{r.naam} · {r.lh_naam}</option>)}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   )
