@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { MultiSelect } from '../lib/MultiSelect'
 import { usePersistedState } from '../lib/usePersistedState'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList,
   PieChart, Pie, Cell,
 } from 'recharts'
 
@@ -32,31 +32,115 @@ const SOORTEN = ['Aardbei', 'Framboos', 'Braam']
 const SOORT_COLORS: Record<string, string> = { Aardbei: '#f43f5e', Framboos: '#a855f7', Braam: '#334155' }
 const LH_COLORS = ['#6366f1','#f97316','#22c55e','#ef4444','#eab308','#06b6d4','#ec4899','#84cc16']
 
-const BarTooltip = ({ active, payload, label }: any) => {
+const ChartTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
+  const multi = payload.length > 1
   const totaal = payload.reduce((s: number, p: any) => s + (p.value ?? 0), 0)
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border-md)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,.12)' }}>
-      <div style={{ fontWeight: 600, marginBottom: 6 }}>{label}</div>
-      {payload.filter((p: any) => p.value > 0).map((p: any) => (
+      {label && <div style={{ fontWeight: 600, marginBottom: 6 }}>{label}</div>}
+      {payload.filter((p: any) => (p.value ?? 0) > 0).map((p: any) => (
         <div key={p.name} style={{ display: 'flex', justifyContent: 'space-between', gap: 20, marginBottom: 2 }}>
-          <span style={{ color: p.fill }}>{p.name}</span>
+          {multi && <span style={{ color: p.fill }}>{p.name}</span>}
           <span style={{ fontFamily: 'monospace' }}>{fmt(p.value)}</span>
         </div>
       ))}
-      {payload.length > 1 && <div style={{ borderTop: '1px solid var(--border)', marginTop: 6, paddingTop: 6, display: 'flex', justifyContent: 'space-between', gap: 20, fontWeight: 600 }}>
-        <span>Totaal</span><span style={{ fontFamily: 'monospace' }}>{fmt(totaal)}</span>
-      </div>}
+      {multi && totaal > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', marginTop: 6, paddingTop: 6, display: 'flex', justifyContent: 'space-between', gap: 20, fontWeight: 600 }}>
+          <span>Totaal</span><span style={{ fontFamily: 'monospace' }}>{fmt(totaal)}</span>
+        </div>
+      )}
     </div>
   )
 }
 
-const PieTooltip = ({ active, payload }: any) => {
-  if (!active || !payload?.length) return null
+// Compact stacked bar chart voor maand
+function MaandChart({ data, soorten, totaal }: { data: any[]; soorten: string[]; totaal: number }) {
+  const last12 = data.slice(-18)
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border-md)', borderRadius: 'var(--radius)', padding: '10px 14px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,.12)' }}>
-      <div style={{ fontWeight: 600 }}>{payload[0].name}</div>
-      <div>{fmt(payload[0].value)}</div>
+    <ResponsiveContainer width="100%" height={160}>
+      <BarChart data={last12} margin={{ top: 20, right: 8, left: 8, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+        <XAxis dataKey="maand" tick={{ fontSize: 10, fill: 'var(--muted)' }} tickLine={false} axisLine={false} />
+        <YAxis tickFormatter={fmtK} tick={{ fontSize: 10, fill: 'var(--muted)' }} tickLine={false} axisLine={false} width={52} />
+        <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--accent-bg)' }} />
+        {soorten.map((s, i) => (
+          <Bar key={s} dataKey={s} stackId="a" fill={SOORT_COLORS[s] ?? '#94a3b8'} radius={i === soorten.length - 1 ? [3,3,0,0] : [0,0,0,0]}>
+            {i === soorten.length - 1 && (
+              <LabelList content={(props: any) => {
+                const row = last12[props.index]
+                if (!row) return null
+                const tot = soorten.reduce((s, k) => s + (row[k] ?? 0), 0)
+                if (tot === 0) return null
+                const pct = totaal > 0 ? (tot / totaal * 100).toFixed(0) : '0'
+                return <text x={props.x + props.width / 2} y={props.y - 5} textAnchor="middle" fontSize={9} fill="var(--muted)">{fmtK(tot)} · {pct}%</text>
+              }} />
+            )}
+          </Bar>
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+// Horizontale bar chart voor licentiehouder / ras / land
+function HorizontalChart({ groups, totaal, color }: { groups: [string, { lk: number }][]; totaal: number; color: string }) {
+  const data = groups.slice(0, 10).map(([name, val]) => ({
+    name: name.length > 22 ? name.slice(0, 20) + '…' : name,
+    lk: val.lk,
+  }))
+  const barH = 22
+  const chartH = Math.max(80, data.length * (barH + 6) + 8)
+  return (
+    <ResponsiveContainer width="100%" height={chartH}>
+      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 150, left: 0, bottom: 0 }}>
+        <XAxis type="number" hide />
+        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--text)' }} width={150} tickLine={false} axisLine={false} />
+        <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--accent-bg)' }} />
+        <Bar dataKey="lk" fill={color} radius={[0, 4, 4, 0]} barSize={barH}>
+          <LabelList content={(props: any) => {
+            const pct = totaal > 0 ? (props.value / totaal * 100).toFixed(1) : '0'
+            return <text x={props.x + props.width + 8} y={props.y + props.height / 2 + 4} fontSize={11} fill="var(--muted)">{fmtK(props.value)} · {pct}%</text>
+          }} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+// Donut chart voor soort / type
+function DonutChart({ groups, totaal }: { groups: [string, { lk: number }][]; totaal: number }) {
+  const data = groups.map(([name, val]) => ({ name, value: val.lk }))
+  const colors = [...SOORT_COLORS ? Object.values(SOORT_COLORS) : [], ...LH_COLORS]
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+      <ResponsiveContainer width={160} height={140}>
+        <PieChart>
+          <Pie data={data} cx="50%" cy="50%" innerRadius={38} outerRadius={62} dataKey="value" paddingAngle={2}
+            label={({ percent }: { percent?: number }) => (percent ?? 0) > 0.04 ? `${((percent ?? 0) * 100).toFixed(0)}%` : ''}
+            labelLine={false}
+          >
+            {data.map((entry, i) => {
+              const col = SOORT_COLORS[entry.name] ?? LH_COLORS[i % LH_COLORS.length]
+              return <Cell key={i} fill={col} />
+            })}
+          </Pie>
+          <Tooltip content={<ChartTooltip />} />
+        </PieChart>
+      </ResponsiveContainer>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {data.map((d, i) => {
+          const col = SOORT_COLORS[d.name] ?? LH_COLORS[i % LH_COLORS.length]
+          const pct = totaal > 0 ? (d.value / totaal * 100).toFixed(1) : '0'
+          return (
+            <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: col, flexShrink: 0 }} />
+              <span>{d.name}</span>
+              <span style={{ color: 'var(--muted)', fontFamily: 'monospace', fontSize: 11 }}>{fmt(d.value)} · {pct}%</span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -77,15 +161,15 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [filterDatumVan, setFilterDatumVan] = usePersistedState('f-dash-datumvan', '')
   const [filterDatumTot, setFilterDatumTot] = usePersistedState('f-dash-datumtot', '')
-  const [filterLh,       setFilterLh]       = usePersistedState<string[]>('f-dash-lh', [])
-  const [filterSoort,    setFilterSoort]    = usePersistedState<string[]>('f-dash-soort', [])
-  const [filterRas,      setFilterRas]      = usePersistedState<string[]>('f-dash-ras', [])
-  const [filterLand,     setFilterLand]     = usePersistedState<string[]>('f-dash-land', [])
-  const [filterType,     setFilterType]     = usePersistedState<string[]>('f-dash-type', [])
-  const [groupBy,        setGroupBy]        = usePersistedState<GroupBy>('f-dash-groupby', 'maand')
+  const [filterLh,    setFilterLh]    = usePersistedState<string[]>('f-dash-lh', [])
+  const [filterSoort, setFilterSoort] = usePersistedState<string[]>('f-dash-soort', [])
+  const [filterRas,   setFilterRas]   = usePersistedState<string[]>('f-dash-ras', [])
+  const [filterLand,  setFilterLand]  = usePersistedState<string[]>('f-dash-land', [])
+  const [filterType,  setFilterType]  = usePersistedState<string[]>('f-dash-type', [])
+  const [groupBy,     setGroupBy]     = usePersistedState<GroupBy>('f-dash-groupby', 'maand')
 
   useEffect(() => {
-    const fetch = async () => {
+    const doFetch = async () => {
       const pageSize = 1000
       let all: OmzetRow[] = []
       let from = 0
@@ -102,7 +186,7 @@ export default function Dashboard() {
       setRows(all)
       setLoading(false)
     }
-    fetch()
+    doFetch()
   }, [])
 
   const filtered = useMemo(() => rows.filter(r =>
@@ -118,7 +202,28 @@ export default function Dashboard() {
   const totLk     = useMemo(() => filtered.reduce((s, r) => s + (r.totaal_licentiekosten ?? 0), 0), [filtered])
   const totAantal = useMemo(() => filtered.reduce((s, r) => s + (r.aantal ?? 0), 0), [filtered])
 
-  // Bar chart: maand × soort (gestapeld)
+  // Groepeer data
+  const getKey = (r: OmzetRow): string => {
+    if (groupBy === 'maand')          return r.datum ? r.datum.slice(0, 7) : '–'
+    if (groupBy === 'licentiehouder') return r.licentiehouder_naam ?? '–'
+    if (groupBy === 'ras')            return r.ras_naam ?? '–'
+    if (groupBy === 'soort')          return r.soort ?? '–'
+    if (groupBy === 'land')           return r.land_debiteur ?? '–'
+    if (groupBy === 'type')           return r.intern_extern ?? '–'
+    return '–'
+  }
+  const groups = useMemo(() => {
+    const map = new Map<string, { lk: number; aantal: number }>()
+    for (const r of filtered) {
+      const key = getKey(r)
+      const e = map.get(key) ?? { lk: 0, aantal: 0 }
+      map.set(key, { lk: e.lk + (r.totaal_licentiekosten ?? 0), aantal: e.aantal + (r.aantal ?? 0) })
+    }
+    return [...map.entries()]
+      .sort((a, b) => groupBy === 'maand' ? b[0].localeCompare(a[0]) : b[1].lk - a[1].lk)
+  }, [filtered, groupBy])
+
+  // Maand chart data
   const maandChartData = useMemo(() => {
     const map = new Map<string, Record<string, number>>()
     for (const r of filtered) {
@@ -129,8 +234,7 @@ export default function Dashboard() {
       const s = r.soort ?? 'Onbekend'
       entry[s] = (entry[s] ?? 0) + r.totaal_licentiekosten
     }
-    return [...map.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
       .map(([m, s]) => ({ maand: fmtMaand(m), ...s }))
   }, [filtered])
 
@@ -138,19 +242,7 @@ export default function Dashboard() {
     SOORTEN.filter(s => maandChartData.some(d => (d as any)[s] > 0))
   , [maandChartData])
 
-  // Pie chart: top licentiehouders
-  const lhPieData = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const r of filtered)
-      if (r.totaal_licentiekosten)
-        map.set(r.licentiehouder_naam ?? '–', (map.get(r.licentiehouder_naam ?? '–') ?? 0) + r.totaal_licentiekosten)
-    const sorted = [...map.entries()].sort((a, b) => b[1] - a[1])
-    if (sorted.length <= 8) return sorted.map(([name, value]) => ({ name, value }))
-    const overige = sorted.slice(7).reduce((s, [, v]) => s + v, 0)
-    return [...sorted.slice(0, 7).map(([name, value]) => ({ name, value })), { name: 'Overige', value: overige }]
-  }, [filtered])
-
-  // Pivot: licentiehouder × maand
+  // Pivot licentiehouder × maand
   const pivotData = useMemo(() => {
     const maanden = [...new Set(filtered.filter(r => r.datum).map(r => r.datum!.slice(0, 7)))].sort()
     const lhMap = new Map<string, Map<string, number>>()
@@ -171,30 +263,18 @@ export default function Dashboard() {
     return { maanden, lhRows, maandTotalen }
   }, [filtered])
 
-  // Groepeer tabel
-  const getKey = (r: OmzetRow): string => {
-    if (groupBy === 'maand')          return r.datum ? r.datum.slice(0, 7) : '–'
-    if (groupBy === 'licentiehouder') return r.licentiehouder_naam ?? '–'
-    if (groupBy === 'ras')            return r.ras_naam ?? '–'
-    if (groupBy === 'soort')          return r.soort ?? '–'
-    if (groupBy === 'land')           return r.land_debiteur ?? '–'
-    if (groupBy === 'type')           return r.intern_extern ?? '–'
-    return '–'
-  }
-  const groupMap = new Map<string, { lk: number; aantal: number }>()
-  for (const r of filtered) {
-    const key = getKey(r)
-    const e = groupMap.get(key) ?? { lk: 0, aantal: 0 }
-    groupMap.set(key, { lk: e.lk + (r.totaal_licentiekosten ?? 0), aantal: e.aantal + (r.aantal ?? 0) })
-  }
-  const groups = [...groupMap.entries()]
-    .sort((a, b) => groupBy === 'maand' ? b[0].localeCompare(a[0]) : b[1].lk - a[1].lk)
-
   const uniq = (fn: (r: OmzetRow) => string | null) =>
     [...new Set(rows.map(fn).filter(Boolean) as string[])].sort()
 
   const hasFilters = filterDatumVan || filterDatumTot || filterLh.length || filterSoort.length || filterRas.length || filterLand.length || filterType.length
   const clearFilters = () => { setFilterDatumVan(''); setFilterDatumTot(''); setFilterLh([]); setFilterSoort([]); setFilterRas([]); setFilterLand([]); setFilterType([]) }
+
+  const chartColor = (key: GroupBy) => {
+    if (key === 'licentiehouder') return '#6366f1'
+    if (key === 'ras')  return '#22c55e'
+    if (key === 'land') return '#06b6d4'
+    return '#6366f1'
+  }
 
   return (
     <>
@@ -216,7 +296,6 @@ export default function Dashboard() {
         {hasFilters && <button className="btn btn-ghost" onClick={clearFilters}>Wis filters</button>}
       </div>
 
-      {/* KPI stats */}
       <div className="stats">
         <div className="stat">
           <div className="stat-label">Totaal licentiekosten</div>
@@ -227,120 +306,42 @@ export default function Dashboard() {
           <div className="stat-value">{loading ? '–' : fmtN(totAantal)}</div>
         </div>
         <div className="stat">
-          <div className="stat-label">Licentiehouders</div>
-          <div className="stat-value">{loading ? '–' : lhPieData.length}</div>
+          <div className="stat-label">Groepen</div>
+          <div className="stat-value">{loading ? '–' : groups.length}</div>
         </div>
       </div>
 
-      {/* Charts */}
-      {!loading && maandChartData.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 16 }}>
-          {/* Bar chart maand */}
-          <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 16, fontSize: 13, fontWeight: 600 }}>Licentiekosten per maand</div>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={maandChartData} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                <XAxis dataKey="maand" tick={{ fontSize: 11, fill: 'var(--muted)' }} tickLine={false} axisLine={false} />
-                <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: 'var(--muted)' }} tickLine={false} axisLine={false} width={64} />
-                <Tooltip content={<BarTooltip />} cursor={{ fill: 'var(--accent-bg)' }} />
-                {activeSoorten.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
-                {activeSoorten.map(s => (
-                  <Bar key={s} dataKey={s} stackId="a" fill={SOORT_COLORS[s] ?? '#94a3b8'} radius={activeSoorten[activeSoorten.length - 1] === s ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Donut chart licentiehouder */}
-          <div className="card" style={{ padding: 20 }}>
-            <div className="card-title" style={{ marginBottom: 16, fontSize: 13, fontWeight: 600 }}>Verdeling licentiehouders</div>
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie data={lhPieData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} dataKey="value" paddingAngle={2}>
-                  {lhPieData.map((_, i) => <Cell key={i} fill={LH_COLORS[i % LH_COLORS.length]} />)}
-                </Pie>
-                <Tooltip content={<PieTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-              {lhPieData.map((d, i) => (
-                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: LH_COLORS[i % LH_COLORS.length], flexShrink: 0 }} />
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span>
-                  <span style={{ color: 'var(--muted)', fontFamily: 'monospace', fontSize: 11 }}>{totLk > 0 ? (d.value / totLk * 100).toFixed(1) + '%' : '–'}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Pivot: licentiehouder × maand */}
-      {!loading && pivotData.lhRows.length > 0 && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div style={{ padding: '14px 20px 10px', fontWeight: 600, fontSize: 13 }}>Licentiekosten per licentiehouder per maand</div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ fontSize: 12 }}>
-              <thead>
-                <tr>
-                  <th style={{ position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 2, minWidth: 160, textAlign: 'left' }}>Licentiehouder</th>
-                  {pivotData.maanden.map(m => (
-                    <th key={m} className="num" style={{ whiteSpace: 'nowrap', minWidth: 90 }}>{fmtMaand(m)}</th>
-                  ))}
-                  <th className="num" style={{ whiteSpace: 'nowrap', minWidth: 100, fontWeight: 700 }}>Totaal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pivotData.lhRows.map(({ lh, totaal, data }) => (
-                  <tr key={lh}>
-                    <td style={{ position: 'sticky', left: 0, background: 'var(--surface)', fontWeight: 500, zIndex: 1 }}>{lh}</td>
-                    {pivotData.maanden.map(m => {
-                      const v = data.get(m) ?? null
-                      return (
-                        <td key={m} className="num" style={{ color: v ? 'var(--text)' : 'var(--muted)' }}>
-                          {v != null ? fmt(v) : '–'}
-                        </td>
-                      )
-                    })}
-                    <td className="num" style={{ fontWeight: 700 }}>{fmt(totaal)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ borderTop: '2px solid var(--border-md)' }}>
-                  <td style={{ position: 'sticky', left: 0, background: 'var(--surface)', fontWeight: 700, zIndex: 1 }}>Totaal</td>
-                  {pivotData.maanden.map(m => (
-                    <td key={m} className="num" style={{ fontWeight: 700 }}>
-                      {pivotData.maandTotalen.get(m) ? fmt(pivotData.maandTotalen.get(m)!) : '–'}
-                    </td>
-                  ))}
-                  <td className="num" style={{ fontWeight: 700 }}>{fmt(totLk)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Groepeer tabel */}
       <div className="card">
+        {/* Tab selector */}
         <div className="card-header">
           <span className="card-title">Groeperen op</span>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {GROUPS.map(g => (
-              <button
-                key={g.key}
-                className={`btn ${groupBy === g.key ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ fontSize: 12, padding: '4px 10px' }}
-                onClick={() => setGroupBy(g.key)}
-              >
+              <button key={g.key} className={`btn ${groupBy === g.key ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => setGroupBy(g.key)}>
                 {g.label}
               </button>
             ))}
           </div>
         </div>
-        <div className="table-wrap" style={{ maxHeight: 'calc(100vh - 360px)', overflowY: 'auto' }}>
+
+        {/* Compacte visual */}
+        {!loading && groups.length > 0 && (
+          <div style={{ padding: '12px 20px 4px', borderBottom: '1px solid var(--border)' }}>
+            {groupBy === 'maand' && activeSoorten.length > 0 && (
+              <MaandChart data={maandChartData} soorten={activeSoorten} totaal={totLk} />
+            )}
+            {(groupBy === 'soort' || groupBy === 'type') && (
+              <DonutChart groups={groups} totaal={totLk} />
+            )}
+            {(groupBy === 'licentiehouder' || groupBy === 'ras' || groupBy === 'land') && (
+              <HorizontalChart groups={groups} totaal={totLk} color={chartColor(groupBy)} />
+            )}
+          </div>
+        )}
+
+        {/* Tabel */}
+        <div className="table-wrap" style={{ maxHeight: 'calc(100vh - 420px)', overflowY: 'auto' }}>
           <table>
             <thead>
               <tr>
@@ -377,6 +378,49 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      {/* Pivot licentiehouder × maand — alleen zichtbaar onder tabblad Licentiehouder */}
+      {!loading && groupBy === 'licentiehouder' && pivotData.lhRows.length > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div style={{ padding: '14px 20px 10px', fontWeight: 600, fontSize: 13 }}>Licentiekosten per licentiehouder per maand</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th style={{ position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 2, minWidth: 160, textAlign: 'left' }}>Licentiehouder</th>
+                  {pivotData.maanden.map(m => (
+                    <th key={m} className="num" style={{ whiteSpace: 'nowrap', minWidth: 90 }}>{fmtMaand(m)}</th>
+                  ))}
+                  <th className="num" style={{ whiteSpace: 'nowrap', minWidth: 100, fontWeight: 700 }}>Totaal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pivotData.lhRows.map(({ lh, totaal, data }) => (
+                  <tr key={lh}>
+                    <td style={{ position: 'sticky', left: 0, background: 'var(--surface)', fontWeight: 500, zIndex: 1 }}>{lh}</td>
+                    {pivotData.maanden.map(m => {
+                      const v = data.get(m) ?? null
+                      return <td key={m} className="num" style={{ color: v ? 'var(--text)' : 'var(--muted)' }}>{v != null ? fmt(v) : '–'}</td>
+                    })}
+                    <td className="num" style={{ fontWeight: 700 }}>{fmt(totaal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: '2px solid var(--border-md)' }}>
+                  <td style={{ position: 'sticky', left: 0, background: 'var(--surface)', fontWeight: 700, zIndex: 1 }}>Totaal</td>
+                  {pivotData.maanden.map(m => (
+                    <td key={m} className="num" style={{ fontWeight: 700 }}>
+                      {pivotData.maandTotalen.get(m) ? fmt(pivotData.maandTotalen.get(m)!) : '–'}
+                    </td>
+                  ))}
+                  <td className="num" style={{ fontWeight: 700 }}>{fmt(totLk)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
     </>
   )
 }
