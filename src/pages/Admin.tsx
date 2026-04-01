@@ -50,7 +50,7 @@ export default function Admin() {
 
   const toggleExpanded = (id: string) => {
     setExpanded(prev => {
-      const next = new Set(prev)
+      const next = new Set<string>(prev)
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
@@ -200,7 +200,7 @@ function UserCard({
             Paginatoegang
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '8px 16px', marginBottom: 16 }}>
-            {PAGE_LABELS.map(({ key, label }) => (
+            {PAGE_LABELS.map(({ key, label }: { key: keyof Omit<PagePermissions, 'can_edit'>; label: string }) => (
               <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                 <input
                   type="checkbox"
