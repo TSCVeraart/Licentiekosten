@@ -214,6 +214,20 @@ export default function Omzetrekeningen() {
     }
   }
 
+  const fetchAllArt = async (): Promise<{ artikel: number | string; code_groep: number | null }[]> => {
+    const pageSize = 1000
+    let all: { artikel: number | string; code_groep: number | null }[] = []
+    let from = 0
+    while (true) {
+      const { data } = await supabase.from('artikel_codes').select('artikel, code_groep').range(from, from + pageSize - 1)
+      if (!data?.length) break
+      all = [...all, ...data as typeof all]
+      if (data.length < pageSize) break
+      from += pageSize
+    }
+    return all
+  }
+
   const fetchAllLk = async () => {
     type LkRow = { code_groep: number; land: string; tarief: number | null }
     const pageSize = 1000
@@ -250,10 +264,10 @@ export default function Omzetrekeningen() {
   }
 
   const load = async () => {
-    const [omzetData, { data: deb }, { data: art }, { data: cgc }, { data: r }, { data: lh }, lk] = await Promise.all([
+    const [omzetData, { data: deb }, freshArt, { data: cgc }, { data: r }, { data: lh }, lk] = await Promise.all([
       fetchAllOmzet(),
       supabase.from('debiteuren').select('nummer, land'),
-      supabase.from('artikel_codes').select('artikel, code_groep'),
+      fetchAllArt(),
       supabase.from('code_groep_config').select('code_groep, ras_id'),
       supabase.from('rassen').select('id, naam, licentiehouder_id'),
       supabase.from('licentiehouders').select('id, naam'),
@@ -271,7 +285,7 @@ export default function Omzetrekeningen() {
 
     // Artikel → code_groep
     const artMap: Record<string, number> = {}
-    for (const a of (art ?? []) as { artikel: number | string; code_groep: number | null }[])
+    for (const a of freshArt)
       if (a.artikel != null && a.code_groep != null) artMap[String(a.artikel)] = a.code_groep
     setArtikelGroepMap(artMap)
 
@@ -312,8 +326,8 @@ export default function Omzetrekeningen() {
       debFrom += 1000
     }
 
-    const [{ data: freshArt }, { data: freshCgc }, { data: freshR }, { data: freshLh }, freshLk] = await Promise.all([
-      supabase.from('artikel_codes').select('artikel, code_groep'),
+    const [freshArt, { data: freshCgc }, { data: freshR }, { data: freshLh }, freshLk] = await Promise.all([
+      fetchAllArt(),
       supabase.from('code_groep_config').select('code_groep, ras_id'),
       supabase.from('rassen').select('id, naam, licentiehouder_id'),
       supabase.from('licentiehouders').select('id, naam'),
@@ -324,7 +338,7 @@ export default function Omzetrekeningen() {
       const nr = parseInt(d.nummer); if (!isNaN(nr)) freshDebMap[nr] = d.land
     }
     const freshArtMap: Record<string, number> = {}
-    for (const a of (freshArt ?? []) as { artikel: number | string; code_groep: number | null }[])
+    for (const a of freshArt)
       if (a.artikel != null && a.code_groep != null) freshArtMap[String(a.artikel)] = a.code_groep
     const freshLhMap: Record<number, string> = {}
     for (const l of (freshLh ?? []) as { id: number; naam: string }[]) freshLhMap[l.id] = l.naam
@@ -395,8 +409,8 @@ export default function Omzetrekeningen() {
       if (data.length < 1000) break
       debFrom += 1000
     }
-    const [{ data: art }, { data: cgc }, { data: r }, { data: lh }, lk] = await Promise.all([
-      supabase.from('artikel_codes').select('artikel, code_groep'),
+    const [art, { data: cgc }, { data: r }, { data: lh }, lk] = await Promise.all([
+      fetchAllArt(),
       supabase.from('code_groep_config').select('code_groep, ras_id'),
       supabase.from('rassen').select('id, naam, licentiehouder_id'),
       supabase.from('licentiehouders').select('id, naam'),
@@ -406,7 +420,7 @@ export default function Omzetrekeningen() {
     const debMap: Record<number, string> = {}
     for (const d of allDeb) { const nr = parseInt(d.nummer); if (!isNaN(nr)) debMap[nr] = d.land }
     const artMap: Record<string, number> = {}
-    for (const a of (art ?? []) as { artikel: number | string; code_groep: number | null }[])
+    for (const a of art)
       if (a.artikel != null && a.code_groep != null) artMap[String(a.artikel)] = a.code_groep
     const lhMap: Record<number, string> = {}
     for (const l of (lh ?? []) as { id: number; naam: string }[]) lhMap[l.id] = l.naam
