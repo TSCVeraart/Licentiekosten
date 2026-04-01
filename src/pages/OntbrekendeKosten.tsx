@@ -366,7 +366,7 @@ export default function OntbrekendeKosten() {
                   ['land_debiteur',       'Country'],
                   ['intern_extern',       'Intern / Extern'],
                   ['debiteur_naam',       'Debiteur: Naam'],
-                  ['omschrijving',        'Artikelomschrijving'],
+                  ['artikel_omschrijving', 'Artikelomschrijving'],
                   ['soort',               'Soort'],
                   ['ras_naam',            'Ras'],
                   ['licentiehouder_naam', 'Licentiehouder'],
