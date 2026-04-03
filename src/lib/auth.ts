@@ -10,6 +10,7 @@ export interface PagePermissions {
   ontbrekende_kosten: boolean
   licentiekosten: boolean
   checklist: boolean
+  contracten: boolean
   can_edit: boolean
 }
 
@@ -33,13 +34,14 @@ export const DEFAULT_PERMISSIONS: PagePermissions = {
   ontbrekende_kosten: false,
   licentiekosten: false,
   checklist: false,
+  contracten: false,
   can_edit: false,
 }
 
 export const FULL_PERMISSIONS: PagePermissions = {
   dashboard: true, debiteuren: true, licentiehouders: true, rassen: true,
   artikelen: true, omzetrekeningen: true, ontbrekende_kosten: true,
-  licentiekosten: true, checklist: true, can_edit: true,
+  licentiekosten: true, checklist: true, contracten: true, can_edit: true,
 }
 
 export const PAGE_LABELS: { key: keyof Omit<PagePermissions, 'can_edit'>; label: string }[] = [
@@ -52,6 +54,7 @@ export const PAGE_LABELS: { key: keyof Omit<PagePermissions, 'can_edit'>; label:
   { key: 'ontbrekende_kosten', label: 'Ontbrekende kosten' },
   { key: 'licentiekosten',     label: 'Licentiekosten' },
   { key: 'checklist',          label: 'Checklist' },
+  { key: 'contracten',         label: 'Contracten' },
 ]
 
 interface AuthContextType {

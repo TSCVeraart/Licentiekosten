@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, Leaf, Package, TrendingUp, Tag, Euro, AlertCircle, ClipboardList, LogOut, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, Users, Leaf, Package, TrendingUp, Tag, Euro, AlertCircle, ClipboardList, LogOut, ShieldCheck, FileSignature } from 'lucide-react'
 import { type Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { AuthContext, type UserProfile, ADMIN_EMAIL, FULL_PERMISSIONS, DEFAULT_PERMISSIONS } from './lib/auth'
@@ -15,6 +15,7 @@ import LicentiekostenPage from './pages/Licentiekosten'
 import OntbrekendeKosten from './pages/OntbrekendeKosten'
 import Checklist from './pages/Checklist'
 import Admin from './pages/Admin'
+import Contracten from './pages/Contracten'
 
 function useDebiteurenBadge() {
   const [count, setCount] = useState(0)
@@ -212,6 +213,7 @@ function AppInner({ profile }: { profile: UserProfile }) {
             </NavLink>
           )}
           {p.licentiehouders && <NavLink to="/licentiehouders" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Leaf />Licentiehouders</NavLink>}
+          {p.contracten && <NavLink to="/contracten" className={({isActive}) => `nav-link ${isActive?'active':''}`}><FileSignature size={16} />Contracten</NavLink>}
           {p.rassen && <NavLink to="/rassen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Package />Rassen</NavLink>}
           {p.artikelen && <NavLink to="/artikelen" className={({isActive}) => `nav-link ${isActive?'active':''}`}><Tag />Artikelen</NavLink>}
           <div className="nav-section">Boekingen</div>
@@ -266,6 +268,7 @@ function AppInner({ profile }: { profile: UserProfile }) {
             {p.licentiehouders && <Route path="/licentiehouders" element={<Licentiehouders />} />}
             {p.rassen && <Route path="/rassen" element={<Rassen />} />}
             {p.omzetrekeningen && <Route path="/omzetrekeningen" element={<Omzetrekeningen />} />}
+            {p.contracten && <Route path="/contracten" element={<Contracten />} />}
             {p.ontbrekende_kosten && <Route path="/ontbrekende-kosten" element={<OntbrekendeKosten />} />}
             {p.artikelen && <Route path="/artikelen" element={<Artikelen />} />}
             {p.licentiekosten && <Route path="/licentiekosten" element={<LicentiekostenPage />} />}
