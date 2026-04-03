@@ -241,7 +241,7 @@ export default function Licentiekosten() {
               {/* Matrix */}
               {!isCollapsed && landen.length > 0 && (
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ fontSize: 12 }}>
+                  <table style={{ fontSize: 12, borderCollapse: 'separate', borderSpacing: 0 }}>
                     <thead>
                       <tr>
                         <th style={{ minWidth: 80, position: 'sticky', left: 0, zIndex: 2, background: 'var(--bg)' }}>Code</th>
