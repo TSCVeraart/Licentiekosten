@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Pencil, Trash2, Upload, FileText, X, CheckCircle2, XCircle, ChevronDown, ChevronRight, AlertTriangle, AlertCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Upload, FileText, X, CheckCircle2, XCircle, ChevronDown, ChevronRight, AlertTriangle, AlertCircle, ChevronsUpDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase, type Contract, type Licentiehouder } from '../lib/supabase'
 
-interface LhMetRassen extends Licentiehouder {
+interface RasInfo { id: number; naam: string; soort: string; licentiehouder_id: number; actief: boolean }
+
+interface LhMet extends Licentiehouder {
   actieveRassen: number
 }
 
 const EMPTY_FORM = {
   licentiehouder_id: 0,
+  ras_id: 0,
   soort: '',
   datum_van: '',
   datum_tot: '',
@@ -30,9 +33,12 @@ const dagenTot = (datum_tot: string | null): number | null => {
   return Math.ceil(ms / 86400000)
 }
 
+const SOORT_KLEUR: Record<string, string> = { Aardbei: '#f43f5e', Framboos: '#a855f7', Braam: '#334155' }
+
 export default function Contracten() {
   const [contracten, setContracten] = useState<Contract[]>([])
-  const [licentiehouders, setLicentiehouders] = useState<LhMetRassen[]>([])
+  const [licentiehouders, setLicentiehouders] = useState<LhMet[]>([])
+  const [rassen, setRassen] = useState<RasInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const [modal, setModal] = useState<'add' | 'edit' | null>(null)
@@ -43,32 +49,27 @@ export default function Contracten() {
   const fileRefs = useRef<Record<number, HTMLInputElement | null>>({})
 
   const load = async () => {
-    const [{ data: c }, { data: lh }, { data: rassen }] = await Promise.all([
+    const [{ data: c }, { data: lh }, { data: r }] = await Promise.all([
       supabase.from('contracten').select('*').order('datum_van', { ascending: false }).limit(2000),
       supabase.from('licentiehouders').select('id,naam').order('naam').limit(500),
-      supabase.from('rassen').select('licentiehouder_id').eq('actief', true).limit(5000),
+      supabase.from('rassen').select('id,naam,soort,licentiehouder_id,actief').order('naam').limit(5000),
     ])
 
-    const rassenPerLh = new Map<number, number>()
-    for (const r of (rassen ?? [])) {
-      rassenPerLh.set(r.licentiehouder_id, (rassenPerLh.get(r.licentiehouder_id) ?? 0) + 1)
+    const rassenLijst = (r ?? []) as RasInfo[]
+    const actievePerLh = new Map<number, number>()
+    for (const ras of rassenLijst) {
+      if (ras.actief) actievePerLh.set(ras.licentiehouder_id, (actievePerLh.get(ras.licentiehouder_id) ?? 0) + 1)
     }
 
-    const lhMet: LhMetRassen[] = (lh ?? []).map((l: any) => ({
-      ...l,
-      actieveRassen: rassenPerLh.get(l.id) ?? 0,
-    }))
-
     setContracten((c ?? []) as Contract[])
-    setLicentiehouders(lhMet)
-    // Standaard alle LH's open die rassen hebben
-    setExpanded(new Set(lhMet.filter(l => l.actieveRassen > 0).map(l => l.id)))
+    setRassen(rassenLijst)
+    setLicentiehouders((lh ?? []).map((l: any) => ({ ...l, actieveRassen: actievePerLh.get(l.id) ?? 0 })))
+    setExpanded(new Set()) // standaard ingeklapt
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
-  // Contracten per licentiehouder
   const contractenPerLh = useMemo(() => {
     const map = new Map<number, Contract[]>()
     for (const c of contracten) {
@@ -79,14 +80,20 @@ export default function Contracten() {
     return map
   }, [contracten])
 
-  // Meldingen: LH met actieve rassen maar geen enkel contract
+  const rassenPerLh = useMemo(() => {
+    const map = new Map<number, RasInfo[]>()
+    for (const r of rassen) {
+      const lijst = map.get(r.licentiehouder_id) ?? []
+      lijst.push(r)
+      map.set(r.licentiehouder_id, lijst)
+    }
+    return map
+  }, [rassen])
+
   const geenContractWaarschuwingen = useMemo(() =>
-    licentiehouders.filter(lh =>
-      lh.actieveRassen > 0 && !(contractenPerLh.get(lh.id)?.length)
-    )
+    licentiehouders.filter(lh => lh.actieveRassen > 0 && !(contractenPerLh.get(lh.id)?.length))
   , [licentiehouders, contractenPerLh])
 
-  // Meldingen: contracten die binnen 90 dagen aflopen (en niet al verlopen)
   const verlopenBinnenkort = useMemo(() => {
     const t = today()
     return contracten
@@ -96,13 +103,20 @@ export default function Contracten() {
       .sort((a, b) => a.dagen - b.dagen)
   }, [contracten])
 
-  const toggleExpanded = (id: number) => {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+  const allExpanded = licentiehouders.length > 0 && expanded.size === licentiehouders.length
+  const toggleAll = () => {
+    if (allExpanded) setExpanded(new Set())
+    else setExpanded(new Set(licentiehouders.map(l => l.id)))
   }
+
+  const toggleExpanded = (id: number) => {
+    setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  // Rassen beschikbaar voor geselecteerde LH in modal
+  const modalRassen = useMemo(() =>
+    rassen.filter(r => r.licentiehouder_id === form.licentiehouder_id)
+  , [rassen, form.licentiehouder_id])
 
   const openAdd = (lhId: number) => {
     setForm({ ...EMPTY_FORM, licentiehouder_id: lhId })
@@ -113,6 +127,7 @@ export default function Contracten() {
   const openEdit = (c: Contract) => {
     setForm({
       licentiehouder_id: c.licentiehouder_id,
+      ras_id:    c.ras_id    ?? 0,
       soort:     c.soort     ?? '',
       datum_van: c.datum_van ?? '',
       datum_tot: c.datum_tot ?? '',
@@ -128,6 +143,7 @@ export default function Contracten() {
     setSaving(true)
     const payload = {
       licentiehouder_id: form.licentiehouder_id,
+      ras_id:     form.ras_id    || null,
       soort:      form.soort     || null,
       datum_van:  form.datum_van || null,
       datum_tot:  form.datum_tot || null,
@@ -140,10 +156,7 @@ export default function Contracten() {
       : supabase.from('contracten').update(payload).eq('id', editId!)
     const { error } = await op
     if (error) { toast.error(error.message); setSaving(false); return }
-    toast.success('Opgeslagen')
-    setSaving(false)
-    setModal(null)
-    load()
+    toast.success('Opgeslagen'); setSaving(false); setModal(null); load()
   }
 
   const remove = async (c: Contract) => {
@@ -152,8 +165,7 @@ export default function Contracten() {
     if (c.bestand_pad) await supabase.storage.from('contracten').remove([c.bestand_pad])
     const { error } = await supabase.from('contracten').delete().eq('id', c.id)
     if (error) { toast.error(error.message); return }
-    toast.success('Verwijderd')
-    load()
+    toast.success('Verwijderd'); load()
   }
 
   const uploadPdf = async (contractId: number, file: File) => {
@@ -162,9 +174,8 @@ export default function Contracten() {
     const existing = contracten.find(c => c.id === contractId)
     if (existing?.bestand_pad) await supabase.storage.from('contracten').remove([existing.bestand_pad])
     const pad = `${contractId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-    const { error: uploadError } = await supabase.storage
-      .from('contracten').upload(pad, file, { contentType: 'application/pdf', upsert: false })
-    if (uploadError) { toast.error(uploadError.message); setUploading(null); return }
+    const { error: ue } = await supabase.storage.from('contracten').upload(pad, file, { contentType: 'application/pdf', upsert: false })
+    if (ue) { toast.error(ue.message); setUploading(null); return }
     const { error } = await supabase.from('contracten')
       .update({ bestand_naam: file.name, bestand_pad: pad, updated_at: new Date().toISOString() })
       .eq('id', contractId)
@@ -191,11 +202,11 @@ export default function Contracten() {
   }
 
   const contractStatus = (c: Contract): 'verlopen' | 'kritiek' | 'aandacht' | 'ok' => {
-    const dagen = dagenTot(c.datum_tot)
-    if (dagen === null) return 'ok'
-    if (dagen < 0)  return 'verlopen'
-    if (dagen <= 30) return 'kritiek'
-    if (dagen <= 90) return 'aandacht'
+    const d = dagenTot(c.datum_tot)
+    if (d === null) return 'ok'
+    if (d < 0)   return 'verlopen'
+    if (d <= 30) return 'kritiek'
+    if (d <= 90) return 'aandacht'
     return 'ok'
   }
 
@@ -213,12 +224,17 @@ export default function Contracten() {
           <div className="page-title">Contracten</div>
           <div className="page-sub">{loading ? 'Laden…' : `${contracten.length} contracten · ${licentiehouders.length} licentiehouders`}</div>
         </div>
+        {!loading && licentiehouders.length > 0 && (
+          <button className="btn btn-ghost" onClick={toggleAll}>
+            <ChevronsUpDown size={14} />
+            {allExpanded ? 'Alles inklappen' : 'Alles uitklappen'}
+          </button>
+        )}
       </div>
 
       {/* Waarschuwingen */}
       {!loading && (geenContractWaarschuwingen.length > 0 || verlopenBinnenkort.length > 0) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-
           {geenContractWaarschuwingen.length > 0 && (
             <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 'var(--radius)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <AlertCircle size={16} style={{ color: '#d97706', flexShrink: 0, marginTop: 1 }} />
@@ -229,14 +245,13 @@ export default function Contracten() {
                 <div style={{ fontSize: 12, color: '#92400e', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
                   {geenContractWaarschuwingen.map(lh => (
                     <span key={lh.id}>
-                      {lh.naam} <span style={{ opacity: 0.7 }}>({lh.actieveRassen} ras{lh.actieveRassen !== 1 ? 'sen' : ''})</span>
+                      {lh.naam} <span style={{ opacity: 0.7 }}>({lh.actieveRassen} {lh.actieveRassen === 1 ? 'ras' : 'rassen'})</span>
                     </span>
                   ))}
                 </div>
               </div>
             </div>
           )}
-
           {verlopenBinnenkort.length > 0 && (
             <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 'var(--radius)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <AlertTriangle size={16} style={{ color: '#ea580c', flexShrink: 0, marginTop: 1 }} />
@@ -247,10 +262,12 @@ export default function Contracten() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {verlopenBinnenkort.map(c => {
                     const lhNaam = licentiehouders.find(l => l.id === c.licentiehouder_id)?.naam ?? '–'
+                    const rasNaam = rassen.find(r => r.id === c.ras_id)?.naam
                     const kleur = c.dagen <= 30 ? '#dc2626' : '#d97706'
                     return (
                       <div key={c.id} style={{ fontSize: 12, color: '#9a3412', display: 'flex', gap: 8, alignItems: 'center' }}>
                         <span style={{ fontWeight: 500 }}>{lhNaam}</span>
+                        {rasNaam && <span style={{ opacity: 0.7 }}>· {rasNaam}</span>}
                         {c.soort && <span style={{ opacity: 0.7 }}>· {c.soort}</span>}
                         <span>· verloopt {fmtDate(c.datum_tot)}</span>
                         <span style={{ fontWeight: 700, color: kleur }}>
@@ -266,22 +283,20 @@ export default function Contracten() {
         </div>
       )}
 
-      {/* Licentiehouders met contracten */}
+      {/* Licentiehouders */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {loading && <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Laden…</div>}
 
         {!loading && licentiehouders.map(lh => {
           const lhContracten = contractenPerLh.get(lh.id) ?? []
+          const lhRassen = rassenPerLh.get(lh.id) ?? []
           const isOpen = expanded.has(lh.id)
           const heeftWaarschuwing = geenContractWaarschuwingen.some(w => w.id === lh.id)
-          const aflopendeContracten = lhContracten.filter(c => {
-            const s = contractStatus(c)
-            return s === 'kritiek' || s === 'aandacht'
-          })
+          const heeftAflopend = lhContracten.some(c => { const s = contractStatus(c); return s === 'kritiek' || s === 'aandacht' })
 
           return (
             <div key={lh.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              {/* LH header rij */}
+              {/* LH header */}
               <div
                 onClick={() => toggleExpanded(lh.id)}
                 style={{
@@ -291,50 +306,67 @@ export default function Contracten() {
                   borderBottom: isOpen ? '1px solid var(--border)' : undefined,
                 }}
               >
-                {isOpen ? <ChevronDown size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />
-                         : <ChevronRight size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />}
+                {isOpen
+                  ? <ChevronDown size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+                  : <ChevronRight size={15} style={{ color: 'var(--muted)', flexShrink: 0 }} />}
                 <span style={{ fontWeight: 600, fontSize: 14, flex: 1 }}>{lh.naam}</span>
-
-                {/* badges */}
                 <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                  {lhContracten.length} contract{lhContracten.length !== 1 ? 'en' : ''}
+                  {lhContracten.length} {lhContracten.length === 1 ? 'contract' : 'contracten'}
                 </span>
                 {lh.actieveRassen > 0 && (
                   <span style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--surface-2)', borderRadius: 999, padding: '2px 8px' }}>
-                    {lh.actieveRassen} actief{lh.actieveRassen !== 1 ? 'e' : ''} ras{lh.actieveRassen !== 1 ? 'sen' : ''}
+                    {lh.actieveRassen} {lh.actieveRassen === 1 ? 'actief ras' : 'actieve rassen'}
                   </span>
                 )}
                 {heeftWaarschuwing && (
-                  <span title="Geen contract" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#d97706', background: '#fef3c7', borderRadius: 999, padding: '2px 8px', fontWeight: 600 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#d97706', background: '#fef3c7', borderRadius: 999, padding: '2px 8px', fontWeight: 600 }}>
                     <AlertCircle size={11} /> geen contract
                   </span>
                 )}
-                {aflopendeContracten.length > 0 && (
-                  <span title="Contract loopt binnenkort af" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#ea580c', background: '#fff7ed', borderRadius: 999, padding: '2px 8px', fontWeight: 600 }}>
+                {heeftAflopend && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#ea580c', background: '#fff7ed', borderRadius: 999, padding: '2px 8px', fontWeight: 600 }}>
                     <AlertTriangle size={11} /> loopt af
                   </span>
                 )}
-                <button
-                  className="btn btn-ghost"
-                  style={{ fontSize: 12, padding: '3px 10px', marginLeft: 4 }}
-                  onClick={e => { e.stopPropagation(); openAdd(lh.id); setExpanded(p => new Set([...p, lh.id])) }}
-                >
+                <button className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 10px', marginLeft: 4 }}
+                  onClick={e => { e.stopPropagation(); openAdd(lh.id); setExpanded(p => new Set([...p, lh.id])) }}>
                   <Plus size={13} /> Contract
                 </button>
               </div>
 
-              {/* Contract tabel */}
+              {/* Uitgeklapt */}
               {isOpen && (
                 <div>
+                  {/* Rassen chips */}
+                  {lhRassen.length > 0 && (
+                    <div style={{ padding: '10px 16px 8px', display: 'flex', flexWrap: 'wrap', gap: 6, borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ fontSize: 11, color: 'var(--muted)', alignSelf: 'center', marginRight: 4 }}>Rassen:</span>
+                      {lhRassen.map(r => (
+                        <span key={r.id} style={{
+                          fontSize: 11, padding: '2px 8px', borderRadius: 999,
+                          background: r.actief ? (SOORT_KLEUR[r.soort] + '18') : 'var(--surface-2)',
+                          color: r.actief ? (SOORT_KLEUR[r.soort] ?? 'var(--text)') : 'var(--muted)',
+                          border: `1px solid ${r.actief ? (SOORT_KLEUR[r.soort] + '44') : 'var(--border)'}`,
+                          fontWeight: r.actief ? 500 : 400,
+                          textDecoration: r.actief ? undefined : 'line-through',
+                        }}>
+                          {r.naam}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Contracten tabel */}
                   {lhContracten.length === 0 ? (
-                    <div style={{ padding: '16px 20px', fontSize: 13, color: 'var(--muted)' }}>
-                      Nog geen contracten voor deze licentiehouder.
+                    <div style={{ padding: '14px 20px', fontSize: 13, color: 'var(--muted)' }}>
+                      Nog geen contracten — klik op "+ Contract" om er een toe te voegen.
                     </div>
                   ) : (
                     <table style={{ width: '100%', fontSize: 13 }}>
                       <thead>
                         <tr>
-                          <th style={{ paddingLeft: 20 }}>Soort contract</th>
+                          <th style={{ paddingLeft: 20 }}>Ras</th>
+                          <th>Soort contract</th>
                           <th>Van</th>
                           <th>Tot</th>
                           <th>Status</th>
@@ -348,30 +380,31 @@ export default function Contracten() {
                           const status = contractStatus(c)
                           const datumKleur = statusKleur(status)
                           const dagen = dagenTot(c.datum_tot)
+                          const rasNaam = rassen.find(r => r.id === c.ras_id)?.naam
                           return (
                             <tr key={c.id}>
-                              <td style={{ paddingLeft: 20, fontWeight: 500 }}>
+                              <td style={{ paddingLeft: 20 }}>
+                                {rasNaam
+                                  ? <span style={{ fontWeight: 500 }}>{rasNaam}</span>
+                                  : <span style={{ color: 'var(--muted)', fontSize: 12 }}>–</span>}
+                              </td>
+                              <td style={{ fontWeight: 500 }}>
                                 {c.soort ?? <span style={{ color: 'var(--muted)', fontStyle: 'italic' }}>–</span>}
                               </td>
                               <td>{fmtDate(c.datum_van)}</td>
                               <td>
-                                <span style={{ color: datumKleur }}>
-                                  {fmtDate(c.datum_tot)}
-                                </span>
+                                <span style={{ color: datumKleur }}>{fmtDate(c.datum_tot)}</span>
                                 {status === 'verlopen' && (
                                   <span style={{ fontSize: 11, marginLeft: 6, color: 'var(--danger)', fontWeight: 600 }}>verlopen</span>
                                 )}
                                 {(status === 'kritiek' || status === 'aandacht') && dagen !== null && (
-                                  <span style={{ fontSize: 11, marginLeft: 6, color: datumKleur, fontWeight: 600 }}>
-                                    nog {dagen}d
-                                  </span>
+                                  <span style={{ fontSize: 11, marginLeft: 6, color: datumKleur, fontWeight: 600 }}>nog {dagen}d</span>
                                 )}
                               </td>
                               <td>
                                 {c.actief
                                   ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#22c55e', fontSize: 12 }}><CheckCircle2 size={13} /> Actief</span>
-                                  : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--muted)', fontSize: 12 }}><XCircle size={13} /> Inactief</span>
-                                }
+                                  : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--muted)', fontSize: 12 }}><XCircle size={13} /> Inactief</span>}
                               </td>
                               <td>
                                 {c.bestand_pad ? (
@@ -379,9 +412,7 @@ export default function Contracten() {
                                     <button className="btn btn-ghost" style={{ fontSize: 12, padding: '2px 8px' }}
                                       onClick={() => downloadPdf(c)} title={c.bestand_naam ?? 'PDF'}>
                                       <FileText size={12} />
-                                      {c.bestand_naam && c.bestand_naam.length > 18
-                                        ? c.bestand_naam.slice(0, 16) + '…'
-                                        : (c.bestand_naam ?? 'PDF')}
+                                      {c.bestand_naam && c.bestand_naam.length > 18 ? c.bestand_naam.slice(0, 16) + '…' : (c.bestand_naam ?? 'PDF')}
                                     </button>
                                     <button className="btn btn-ghost" style={{ padding: '2px 5px', color: 'var(--muted)' }}
                                       onClick={() => removePdf(c)} title="PDF verwijderen"><X size={11} /></button>
@@ -394,15 +425,13 @@ export default function Contracten() {
                                       <Upload size={12} />
                                       {uploading === c.id ? 'Uploaden…' : 'Upload PDF'}
                                     </button>
-                                    <input
-                                      ref={el => { fileRefs.current[c.id] = el }}
+                                    <input ref={el => { fileRefs.current[c.id] = el }}
                                       type="file" accept="application/pdf" style={{ display: 'none' }}
-                                      onChange={e => { const f = e.target.files?.[0]; if (f) uploadPdf(c.id, f); e.target.value = '' }}
-                                    />
+                                      onChange={e => { const f = e.target.files?.[0]; if (f) uploadPdf(c.id, f); e.target.value = '' }} />
                                   </>
                                 )}
                               </td>
-                              <td style={{ color: 'var(--muted)', fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <td style={{ color: 'var(--muted)', fontSize: 12, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {c.notities ?? ''}
                               </td>
                               <td style={{ whiteSpace: 'nowrap' }}>
@@ -439,18 +468,26 @@ export default function Contracten() {
                 <div>
                   <label className="field-label">Licentiehouder</label>
                   <select className="field-input" value={form.licentiehouder_id}
-                    onChange={e => setForm(f => ({ ...f, licentiehouder_id: Number(e.target.value) }))}>
+                    onChange={e => setForm(f => ({ ...f, licentiehouder_id: Number(e.target.value), ras_id: 0 }))}>
                     {licentiehouders.map(lh => <option key={lh.id} value={lh.id}>{lh.naam}</option>)}
                   </select>
                 </div>
               )}
               <div>
+                <label className="field-label">Ras <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optioneel)</span></label>
+                <select className="field-input" value={form.ras_id}
+                  onChange={e => setForm(f => ({ ...f, ras_id: Number(e.target.value) }))}>
+                  <option value={0}>— Geen specifiek ras —</option>
+                  {modalRassen.map(r => (
+                    <option key={r.id} value={r.id}>{r.naam}{!r.actief ? ' (inactief)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="field-label">Soort contract</label>
-                <input type="text" className="field-input"
-                  value={form.soort}
+                <input type="text" className="field-input" value={form.soort}
                   onChange={e => setForm(f => ({ ...f, soort: e.target.value }))}
-                  placeholder="bijv. Licentieovereenkomst, Teeltlicentie, NDA…"
-                />
+                  placeholder="bijv. Licentieovereenkomst, Teeltlicentie, NDA…" />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
