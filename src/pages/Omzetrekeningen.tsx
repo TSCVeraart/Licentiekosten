@@ -22,7 +22,7 @@ interface Omzetrekening {
   artikel: string | null
   aantal: number | null
   soort: SoortPlant | null
-  code_groep: number | null
+  code_groep: string | null
   ras_naam: string | null
   licentiehouder_naam: string | null
   licentiekosten: number | null
@@ -105,8 +105,8 @@ const COL_KEYS = COLS.map(c => c.key)
 export default function Omzetrekeningen() {
   const [rows, setRows] = useState<Omzetrekening[]>([])
   const [debLandMap, setDebLandMap] = useState<Record<number, string>>({})
-  const [artikelGroepMap, setArtikelGroepMap] = useState<Record<string, number>>({})
-  const [codeGroepRasMap, setCodeGroepRasMap] = useState<Record<number, { naam: string; lh_naam: string }>>({})
+  const [artikelGroepMap, setArtikelGroepMap] = useState<Record<string, string>>({})
+  const [codeGroepRasMap, setCodeGroepRasMap] = useState<Record<string, { naam: string; lh_naam: string }>>({})
   const [tarievenMap, setTarievenMap] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [paste, setPaste] = useState('')
@@ -214,9 +214,9 @@ export default function Omzetrekeningen() {
     }
   }
 
-  const fetchAllArt = async (): Promise<{ artikel: number | string; code_groep: number | null }[]> => {
+  const fetchAllArt = async (): Promise<{ artikel: number | string; code_groep: string | null }[]> => {
     const pageSize = 1000
-    let all: { artikel: number | string; code_groep: number | null }[] = []
+    let all: { artikel: number | string; code_groep: string | null }[] = []
     let from = 0
     while (true) {
       const { data } = await supabase.from('artikel_codes').select('artikel, code_groep').range(from, from + pageSize - 1)
@@ -229,7 +229,7 @@ export default function Omzetrekeningen() {
   }
 
   const fetchAllLk = async () => {
-    type LkRow = { code_groep: number; land: string; tarief: number | null }
+    type LkRow = { code_groep: string; land: string; tarief: number | null }
     const pageSize = 1000
     let all: LkRow[] = []
     let from = 0
@@ -243,7 +243,7 @@ export default function Omzetrekeningen() {
     return all
   }
 
-  const buildTkMap = (lk: { code_groep: number; land: string; tarief: number | null }[]): Record<string, number> => {
+  const buildTkMap = (lk: { code_groep: string; land: string; tarief: number | null }[]): Record<string, number> => {
     const map: Record<string, number> = {}
     for (const t of lk) if (t.tarief != null) map[`${t.code_groep}_${t.land}`] = t.tarief
     return map
@@ -285,7 +285,7 @@ export default function Omzetrekeningen() {
     setDebLandMap(debMap)
 
     // Artikel → code_groep
-    const artMap: Record<string, number> = {}
+    const artMap: Record<string, string> = {}
     for (const a of freshArt)
       if (a.artikel != null && a.code_groep != null) artMap[String(a.artikel)] = a.code_groep
     setArtikelGroepMap(artMap)
@@ -300,8 +300,8 @@ export default function Omzetrekeningen() {
       rasMap[ras.id] = { naam: ras.naam, lh_naam: lhMap[ras.licentiehouder_id] ?? '–' }
 
     // code_groep → ras info
-    const cgRasMap: Record<number, { naam: string; lh_naam: string }> = {}
-    for (const c of (cgc ?? []) as { code_groep: number; ras_id: number | null }[])
+    const cgRasMap: Record<string, { naam: string; lh_naam: string }> = {}
+    for (const c of (cgc ?? []) as { code_groep: string; ras_id: number | null }[])
       if (c.ras_id != null && rasMap[c.ras_id]) cgRasMap[c.code_groep] = rasMap[c.ras_id]
     setCodeGroepRasMap(cgRasMap)
 
@@ -338,7 +338,7 @@ export default function Omzetrekeningen() {
     for (const d of allDeb) {
       const nr = parseInt(d.nummer); if (!isNaN(nr)) freshDebMap[nr] = d.land
     }
-    const freshArtMap: Record<string, number> = {}
+    const freshArtMap: Record<string, string> = {}
     for (const a of freshArt)
       if (a.artikel != null && a.code_groep != null) freshArtMap[String(a.artikel)] = a.code_groep
     const freshLhMap: Record<number, string> = {}
@@ -346,8 +346,8 @@ export default function Omzetrekeningen() {
     const freshRasMap: Record<number, { naam: string; lh_naam: string }> = {}
     for (const ras of (freshR ?? []) as { id: number; naam: string; licentiehouder_id: number }[])
       freshRasMap[ras.id] = { naam: ras.naam, lh_naam: freshLhMap[ras.licentiehouder_id] ?? '–' }
-    const freshCgRasMap: Record<number, { naam: string; lh_naam: string }> = {}
-    for (const c of (freshCgc ?? []) as { code_groep: number; ras_id: number | null }[])
+    const freshCgRasMap: Record<string, { naam: string; lh_naam: string }> = {}
+    for (const c of (freshCgc ?? []) as { code_groep: string; ras_id: number | null }[])
       if (c.ras_id != null && freshRasMap[c.ras_id]) freshCgRasMap[c.code_groep] = freshRasMap[c.ras_id]
     const freshTkMap = buildTkMap(freshLk)
 
@@ -420,7 +420,7 @@ export default function Omzetrekeningen() {
 
     const debMap: Record<number, string> = {}
     for (const d of allDeb) { const nr = parseInt(d.nummer); if (!isNaN(nr)) debMap[nr] = d.land }
-    const artMap: Record<string, number> = {}
+    const artMap: Record<string, string> = {}
     for (const a of art)
       if (a.artikel != null && a.code_groep != null) artMap[String(a.artikel)] = a.code_groep
     const lhMap: Record<number, string> = {}
@@ -428,8 +428,8 @@ export default function Omzetrekeningen() {
     const rasMap: Record<number, { naam: string; lh_naam: string }> = {}
     for (const ras of (r ?? []) as { id: number; naam: string; licentiehouder_id: number }[])
       rasMap[ras.id] = { naam: ras.naam, lh_naam: lhMap[ras.licentiehouder_id] ?? '–' }
-    const cgRasMap: Record<number, { naam: string; lh_naam: string }> = {}
-    for (const c of (cgc ?? []) as { code_groep: number; ras_id: number | null }[])
+    const cgRasMap: Record<string, { naam: string; lh_naam: string }> = {}
+    for (const c of (cgc ?? []) as { code_groep: string; ras_id: number | null }[])
       if (c.ras_id != null && rasMap[c.ras_id]) cgRasMap[c.code_groep] = rasMap[c.ras_id]
     const tkMap = buildTkMap(lk)
 
@@ -511,7 +511,7 @@ export default function Omzetrekeningen() {
     )
   }).sort((a, b) => {
     if (!sortCol) return 0
-    const numCols = ['debet_eur','credit_eur','vv_bedrag','aantal','licentiekosten','totaal_licentiekosten','debiteur_nr','artikel','code_groep']
+    const numCols = ['debet_eur','credit_eur','vv_bedrag','aantal','licentiekosten','totaal_licentiekosten','debiteur_nr','artikel']
     if (numCols.includes(sortCol)) {
       const av = (a as any)[sortCol] ?? -Infinity
       const bv = (b as any)[sortCol] ?? -Infinity

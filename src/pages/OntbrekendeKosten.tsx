@@ -17,7 +17,7 @@ interface OmzetRij {
   land_debiteur: string | null
   soort: string | null
   artikel: number | null
-  code_groep: number | null
+  code_groep: string | null
   ras_naam: string | null
   licentiehouder_naam: string | null
   intern_extern: string | null
@@ -182,7 +182,7 @@ export default function OntbrekendeKosten() {
   })
 
   const sortedFiltered = sortCol ? [...filtered].sort((a, b) => {
-    const numCols = ['debiteur_nr', 'artikel', 'code_groep', 'aantal']
+    const numCols = ['debiteur_nr', 'artikel', 'aantal']
     if (numCols.includes(sortCol)) {
       const av = (a as any)[sortCol] ?? -Infinity
       const bv = (b as any)[sortCol] ?? -Infinity

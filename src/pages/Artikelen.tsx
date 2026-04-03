@@ -8,7 +8,7 @@ interface ArtikelCode {
   id: number
   artikel: number | null
   omschrijving: string | null
-  code_groep: number | null
+  code_groep: string | null
   created_at: string
 }
 
@@ -51,7 +51,7 @@ export default function Artikelen() {
       return {
         artikel: c[0]?.trim() ? parseInt(c[0]) || null : null,
         omschrijving: c[1]?.trim() || null,
-        code_groep: c[2]?.trim() ? parseInt(c[2]) || null : null,
+        code_groep: c[2]?.trim() || null,
       }
     })
     setPreview(parsed)
@@ -77,7 +77,7 @@ export default function Artikelen() {
   }
 
   const saveCodeGroep = async (id: number) => {
-    const val = editVal.trim() ? parseInt(editVal) || null : null
+    const val = editVal.trim() || null
     const { error } = await supabase.from('artikel_codes').update({ code_groep: val }).eq('id', id)
     if (error) { toast.error(error.message); return }
     setEditingId(null)
@@ -90,7 +90,7 @@ export default function Artikelen() {
     const { error } = await supabase.from('artikel_codes').upsert({
       artikel: parseInt(form.artikel) || null,
       omschrijving: form.omschrijving.trim() || null,
-      code_groep: form.code_groep.trim() ? parseInt(form.code_groep) || null : null,
+      code_groep: form.code_groep.trim() || null,
     }, { onConflict: 'artikel' })
     if (error) { toast.error(error.message); setSaving(false); return }
     toast.success('Opgeslagen')
@@ -225,7 +225,7 @@ export default function Artikelen() {
                   <td onClick={() => { setEditingId(r.id); setEditVal(r.code_groep != null ? String(r.code_groep) : '') }} style={{ cursor: 'pointer', minWidth: 100 }}>
                     {editingId === r.id
                       ? <input
-                          type="number"
+                          type="text"
                           value={editVal}
                           autoFocus
                           onChange={e => setEditVal(e.target.value)}
@@ -262,7 +262,7 @@ export default function Artikelen() {
                 </div>
                 <div className="form-group">
                   <label>Code groep</label>
-                  <input type="number" value={form.code_groep} onChange={e => setForm(f => ({ ...f, code_groep: e.target.value }))} placeholder="bijv. 101" />
+                  <input type="text" value={form.code_groep} onChange={e => setForm(f => ({ ...f, code_groep: e.target.value }))} placeholder="bijv. Tulameen 2C" />
                 </div>
               </div>
               <div className="form-group">

@@ -5,12 +5,12 @@ import toast from 'react-hot-toast'
 import { supabase, type Ras, type Licentiehouder } from '../lib/supabase'
 import { exportCsv } from '../lib/exportCsv'
 
-interface CodeGroep { code_groep: number; omschrijving: string | null }
+interface CodeGroep { code_groep: string; omschrijving: string | null }
 interface RasDetail extends Ras { lh_naam: string; landen: string[] }
 
 export default function Licentiekosten() {
   const [codeGroepen, setCodeGroepen] = useState<CodeGroep[]>([])
-  const [rasConfigs, setRasConfigs] = useState<Record<number, number | null>>({})
+  const [rasConfigs, setRasConfigs] = useState<Record<string, number | null>>({})
   const [rassen, setRassen] = useState<RasDetail[]>([])
   const [tarieven, setTarieven] = useState<Record<string, number | null>>({})
   const [loading, setLoading] = useState(true)
@@ -23,7 +23,7 @@ export default function Licentiekosten() {
   const [filterRas,          setFilterRas]          = usePersistedState('f-lk-ras', '')
   const [filterLh,           setFilterLh]           = usePersistedState('f-lk-lh', '')
   const [filterSoort,        setFilterSoort]        = usePersistedState('f-lk-soort', '')
-  const [bulkVal, setBulkVal] = useState<Record<number, string>>({})
+  const [bulkVal, setBulkVal] = useState<Record<string, string>>({})
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editVal, setEditVal] = useState('')
   const savingRef = useRef(false)
@@ -38,7 +38,7 @@ export default function Licentiekosten() {
 
   const fetchAllLk = async () => {
     const pageSize = 1000
-    let all: { code_groep: number; land: string; tarief: number | null }[] = []
+    let all: { code_groep: string; land: string; tarief: number | null }[] = []
     let from = 0
     while (true) {
       const { data } = await supabase.from('licentiekosten').select('code_groep, land, tarief').range(from, from + pageSize - 1)
@@ -59,16 +59,16 @@ export default function Licentiekosten() {
       fetchAllLk(),
     ])
 
-    const seen = new Set<number>()
+    const seen = new Set<string>()
     const cg: CodeGroep[] = []
-    for (const row of (ak ?? []) as { code_groep: number; omschrijving: string | null }[]) {
+    for (const row of (ak ?? []) as { code_groep: string; omschrijving: string | null }[]) {
       if (!seen.has(row.code_groep)) { seen.add(row.code_groep); cg.push(row) }
     }
-    cg.sort((a, b) => a.code_groep - b.code_groep)
+    cg.sort((a, b) => a.code_groep.localeCompare(b.code_groep))
     setCodeGroepen(cg)
 
-    const cfgMap: Record<number, number | null> = {}
-    for (const c of (cgc ?? []) as { code_groep: number; ras_id: number | null }[]) cfgMap[c.code_groep] = c.ras_id
+    const cfgMap: Record<string, number | null> = {}
+    for (const c of (cgc ?? []) as { code_groep: string; ras_id: number | null }[]) cfgMap[c.code_groep] = c.ras_id
     setRasConfigs(cfgMap)
 
     const lhMap: Record<number, string> = {}
@@ -88,7 +88,7 @@ export default function Licentiekosten() {
   }
   useEffect(() => { load() }, [])
 
-  const saveRasLink = async (code_groep: number, ras_id: number | null) => {
+  const saveRasLink = async (code_groep: string, ras_id: number | null) => {
     setRasConfigs(prev => ({ ...prev, [code_groep]: ras_id }))
     const { error: delErr } = await supabase.from('code_groep_config').delete().eq('code_groep', code_groep)
     if (delErr) { toast.error('Fout bij opslaan ras: ' + delErr.message); return }
@@ -96,7 +96,7 @@ export default function Licentiekosten() {
     if (insErr) toast.error('Fout bij opslaan ras: ' + insErr.message)
   }
 
-  const saveTarief = async (code_groep: number, land: string, val: string) => {
+  const saveTarief = async (code_groep: string, land: string, val: string) => {
     if (savingRef.current) return
     savingRef.current = true
     const tarief = val.trim() ? parseFloat(val.replace(',', '.')) : null
@@ -110,7 +110,7 @@ export default function Licentiekosten() {
     savingRef.current = false
   }
 
-  const applyBulk = async (code_groep: number, landen: string[]) => {
+  const applyBulk = async (code_groep: string, landen: string[]) => {
     const val = bulkVal[code_groep]
     if (!val?.trim()) return
     const tarief = parseFloat(val.replace(',', '.'))
