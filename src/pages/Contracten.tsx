@@ -43,6 +43,8 @@ export default function Contracten() {
   const [editId, setEditId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState<number | null>(null)
+  const [hideGeenContract, setHideGeenContract] = useState(false)
+  const [hideVerloopt, setHideVerloopt] = useState(false)
   const fileRefs = useRef<Record<number, HTMLInputElement | null>>({})
   const initialLoadDone = useRef(false)
 
@@ -300,12 +302,12 @@ export default function Contracten() {
       </div>
 
       {/* Waarschuwingen */}
-      {!loading && (geenContractWaarschuwingen.length > 0 || verlopenBinnenkort.length > 0) && (
+      {!loading && ((!hideGeenContract && geenContractWaarschuwingen.length > 0) || (!hideVerloopt && verlopenBinnenkort.length > 0)) && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-          {geenContractWaarschuwingen.length > 0 && (
+          {!hideGeenContract && geenContractWaarschuwingen.length > 0 && (
             <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 'var(--radius)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <AlertCircle size={16} style={{ color: '#d97706', flexShrink: 0, marginTop: 1 }} />
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: 13, color: '#92400e', marginBottom: 4 }}>Licentiehouders met actieve rassen maar geen contract</div>
                 <div style={{ fontSize: 12, color: '#92400e', display: 'flex', flexWrap: 'wrap', gap: '4px 12px' }}>
                   {geenContractWaarschuwingen.map(lh => (
@@ -313,12 +315,13 @@ export default function Contracten() {
                   ))}
                 </div>
               </div>
+              <button onClick={() => setHideGeenContract(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#92400e', opacity: 0.5, padding: 2, flexShrink: 0 }} title="Sluiten"><X size={14} /></button>
             </div>
           )}
-          {verlopenBinnenkort.length > 0 && (
+          {!hideVerloopt && verlopenBinnenkort.length > 0 && (
             <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 'var(--radius)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <AlertTriangle size={16} style={{ color: '#ea580c', flexShrink: 0, marginTop: 1 }} />
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: 13, color: '#9a3412', marginBottom: 6 }}>Contracten die binnenkort aflopen</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {verlopenBinnenkort.map(c => {
@@ -339,6 +342,7 @@ export default function Contracten() {
                   })}
                 </div>
               </div>
+              <button onClick={() => setHideVerloopt(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9a3412', opacity: 0.5, padding: 2, flexShrink: 0 }} title="Sluiten"><X size={14} /></button>
             </div>
           )}
         </div>
