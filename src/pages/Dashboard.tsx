@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { MultiSelect } from '../lib/MultiSelect'
 import { usePersistedState } from '../lib/usePersistedState'
@@ -158,6 +159,7 @@ const GROUPS: { key: GroupBy; label: string }[] = [
 ]
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const [rows, setRows] = useState<OmzetRow[]>([])
   const [loading, setLoading] = useState(true)
   const [filterDatumVan, setFilterDatumVan] = usePersistedState('f-dash-datumvan', '')
@@ -271,6 +273,47 @@ export default function Dashboard() {
   const hasFilters = filterDatumVan || filterDatumTot || filterLh.length || filterSoort.length || filterRas.length || filterLand.length || filterType.length
   const clearFilters = () => { setFilterDatumVan(''); setFilterDatumTot(''); setFilterLh([]); setFilterSoort([]); setFilterRas([]); setFilterLand([]); setFilterType([]) }
 
+  const drillDown = (key: string) => {
+    // Kopieer bestaande dashboard-filters naar omzetrekeningen-filters
+    let van  = filterDatumVan
+    let tot  = filterDatumTot
+    let soort = [...filterSoort]
+    let land  = [...filterLand]
+    let ras   = [...filterRas]
+    let lh    = [...filterLh]
+    let type  = [...filterType]
+
+    // Voeg groep-specifiek filter toe
+    if (key !== '–') {
+      if (groupBy === 'maand') {
+        const [y, m] = key.split('-')
+        const lastDay = new Date(parseInt(y), parseInt(m), 0).getDate()
+        van = `${y}-${m}-01`
+        tot = `${y}-${m}-${String(lastDay).padStart(2, '0')}`
+      } else if (groupBy === 'licentiehouder' || groupBy === 'afloop') {
+        if (!lh.includes(key)) lh = [key]
+      } else if (groupBy === 'ras') {
+        if (!ras.includes(key)) ras = [key]
+      } else if (groupBy === 'soort') {
+        if (!soort.includes(key)) soort = [key]
+      } else if (groupBy === 'land') {
+        if (!land.includes(key)) land = [key]
+      } else if (groupBy === 'type') {
+        if (!type.includes(key)) type = [key]
+      }
+    }
+
+    localStorage.setItem('f-omzet-datumvan', JSON.stringify(van))
+    localStorage.setItem('f-omzet-datumtot', JSON.stringify(tot))
+    localStorage.setItem('f-omzet-soort',    JSON.stringify(soort))
+    localStorage.setItem('f-omzet-land',     JSON.stringify(land))
+    localStorage.setItem('f-omzet-ras',      JSON.stringify(ras))
+    localStorage.setItem('f-omzet-lh',       JSON.stringify(lh))
+    localStorage.setItem('f-omzet-type',     JSON.stringify(type))
+    localStorage.setItem('f-omzet-search',   JSON.stringify(''))
+    navigate('/omzetrekeningen')
+  }
+
   const chartColor = (key: GroupBy) => {
     if (key === 'licentiehouder') return '#6366f1'
     if (key === 'ras')  return '#22c55e'
@@ -358,8 +401,14 @@ export default function Dashboard() {
                 {loading && <tr><td colSpan={4} className="empty">Laden…</td></tr>}
                 {!loading && groups.length === 0 && <tr><td colSpan={4} className="empty">Geen data — importeer eerst omzetrekeningen.</td></tr>}
                 {groups.map(([key, val]) => (
-                  <tr key={key}>
-                    <td style={{ fontWeight: 500 }}>{key}</td>
+                  <tr key={key} onClick={() => drillDown(key)}
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-bg)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '')}
+                  >
+                    <td style={{ fontWeight: 500 }}>
+                      {groupBy === 'maand' && key !== '–' ? fmtMaand(key) : key}
+                    </td>
                     <td className="num">{fmtN(val.aantal)}</td>
                     <td className="num">{fmt(val.lk)}</td>
                     <td className="num" style={{ color: 'var(--muted)', fontSize: 12 }}>
@@ -400,7 +449,11 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {pivotData.lhRows.map(({ lh, totaal, data }) => (
-                    <tr key={lh}>
+                    <tr key={lh} onClick={() => drillDown(lh)}
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-bg)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '')}
+                    >
                       <td style={{ position: 'sticky', left: 0, background: 'var(--surface)', fontWeight: 500, zIndex: 1 }}>{lh}</td>
                       {pivotData.maanden.map(m => {
                         const v = data.get(m) ?? null
