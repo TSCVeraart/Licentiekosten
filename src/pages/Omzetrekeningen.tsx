@@ -527,7 +527,20 @@ export default function Omzetrekeningen() {
       : bv.localeCompare(av, 'nl', { sensitivity: 'base', numeric: true })
   })
 
-  const totaalLk = filtered.reduce((s, r) => s + (r.totaal_licentiekosten ?? 0), 0)
+  const totaalLk     = filtered.reduce((s, r) => s + (r.totaal_licentiekosten ?? 0), 0)
+  const totaalDebet  = filtered.reduce((s, r) => s + (r.debet_eur  ?? 0), 0)
+  const totaalCredit = filtered.reduce((s, r) => s + (r.credit_eur ?? 0), 0)
+  const totaalVv     = filtered.reduce((s, r) => s + (r.vv_bedrag  ?? 0), 0)
+  const totaalAantal = filtered.reduce((s, r) => s + (r.aantal     ?? 0), 0)
+
+  const colTotaal = (key: string): string | null => {
+    if (key === 'debet_eur')             return fmt(totaalDebet)
+    if (key === 'credit_eur')            return fmt(totaalCredit)
+    if (key === 'vv_bedrag')             return fmt(totaalVv)
+    if (key === 'aantal')                return Math.round(totaalAantal).toLocaleString('nl-NL')
+    if (key === 'totaal_licentiekosten') return fmt(totaalLk)
+    return null
+  }
 
   const previewHeaders = ['Datum','Rekening','Omschrijving','Debet','Credit','V.V.','Deb. nr','Deb. naam','Land','Soort','Artikel omschr.','Artikel','Code groep','Ras','Licentiehouder','Tarief','Totaal LK','Type','Aantal']
 
@@ -723,8 +736,11 @@ export default function Omzetrekeningen() {
             {filtered.length > 0 && (
               <tfoot>
                 <tr>
-                  <td colSpan={orderedCols.length - 1}>Totaal ({filtered.length} regels)</td>
-                  <td className="num">{fmt(totaalLk)}</td>
+                  {orderedCols.map((col, i) => {
+                    const tot = colTotaal(col.key)
+                    if (i === 0) return <td key={col.key}>Totaal ({filtered.length} regels)</td>
+                    return <td key={col.key} className={tot ? 'num' : ''}>{tot ?? ''}</td>
+                  })}
                   <td></td>
                 </tr>
               </tfoot>
