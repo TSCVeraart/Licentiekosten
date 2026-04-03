@@ -244,8 +244,8 @@ export default function Licentiekosten() {
                   <table style={{ fontSize: 12, borderCollapse: 'separate', borderSpacing: 0 }}>
                     <thead>
                       <tr>
-                        <th style={{ minWidth: 80, position: 'sticky', left: 0, zIndex: 2, background: 'var(--bg)' }}>Code</th>
-                        <th style={{ minWidth: 180, position: 'sticky', left: 80, zIndex: 2, background: 'var(--bg)' }}>Omschrijving</th>
+                        <th style={{ minWidth: 80, position: 'sticky', left: 0, zIndex: 12, background: 'var(--bg)' }}>Code</th>
+                        <th style={{ minWidth: 180, position: 'sticky', left: 80, zIndex: 12, background: 'var(--bg)' }}>Omschrijving</th>
                         {landen.map(land => (
                           <th key={land} className="num" style={{ minWidth: 90, whiteSpace: 'nowrap' }}>{land}</th>
                         ))}
