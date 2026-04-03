@@ -244,8 +244,8 @@ export default function Licentiekosten() {
                   <table style={{ fontSize: 12 }}>
                     <thead>
                       <tr>
-                        <th style={{ minWidth: 80, position: 'sticky', left: 0, zIndex: 2, background: 'var(--card-bg, #fff)' }}>Code</th>
-                        <th style={{ minWidth: 180, position: 'sticky', left: 80, zIndex: 2, background: 'var(--card-bg, #fff)' }}>Omschrijving</th>
+                        <th style={{ minWidth: 80, position: 'sticky', left: 0, zIndex: 2, background: 'var(--bg)' }}>Code</th>
+                        <th style={{ minWidth: 180, position: 'sticky', left: 80, zIndex: 2, background: 'var(--bg)' }}>Omschrijving</th>
                         {landen.map(land => (
                           <th key={land} className="num" style={{ minWidth: 90, whiteSpace: 'nowrap' }}>{land}</th>
                         ))}
@@ -257,8 +257,8 @@ export default function Licentiekosten() {
                         const rowFilled = landen.every(l => tarieven[`${cg.code_groep}_${l}`] != null)
                         return (
                           <tr key={cg.code_groep} style={{ background: rowFilled ? '#f0fdf420' : undefined }}>
-                            <td className="mono" style={{ fontWeight: 600, color: 'var(--muted)', position: 'sticky', left: 0, zIndex: 1, background: rowFilled ? '#f0fdf4' : 'var(--card-bg, #fff)' }}>{cg.code_groep}</td>
-                            <td style={{ position: 'sticky', left: 80, zIndex: 1, background: rowFilled ? '#f0fdf4' : 'var(--card-bg, #fff)' }}>{cg.omschrijving ?? '–'}</td>
+                            <td className="mono" style={{ fontWeight: 600, color: 'var(--muted)', position: 'sticky', left: 0, zIndex: 1, background: rowFilled ? '#f0fdf4' : 'var(--surface)' }}>{cg.code_groep}</td>
+                            <td style={{ position: 'sticky', left: 80, zIndex: 1, background: rowFilled ? '#f0fdf4' : 'var(--surface)' }}>{cg.omschrijving ?? '–'}</td>
                             {landen.map(land => {
                               const key = `${cg.code_groep}_${land}`
                               const tarief = tarieven[key]
