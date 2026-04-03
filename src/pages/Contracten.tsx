@@ -449,7 +449,7 @@ export default function Contracten() {
         const lhNaam = licentiehouders.find(l => l.id === form.licentiehouder_id)?.naam ?? ''
         const rasNaam = rassen.find(r => r.id === form.ras_id)?.naam
         return (
-          <div className="modal-backdrop" onClick={() => setModal(null)}>
+          <div className="modal-overlay" onClick={() => setModal(null)}>
             <div className="modal" onClick={e => e.stopPropagation()} style={{ width: 460 }}>
               <div className="modal-header">
                 <span>
