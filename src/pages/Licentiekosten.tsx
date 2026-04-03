@@ -250,6 +250,7 @@ export default function Licentiekosten() {
                           <th key={land} className="num" style={{ minWidth: 90, whiteSpace: 'nowrap' }}>{land}</th>
                         ))}
                         <th style={{ minWidth: 150, color: 'var(--muted)', fontWeight: 400 }}>Snel invullen</th>
+                        <th style={{ minWidth: 180, color: 'var(--muted)', fontWeight: 400 }}>Ras wijzigen</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -305,6 +306,16 @@ export default function Licentiekosten() {
                                   <Check size={11} /> Alle
                                 </button>
                               </div>
+                            </td>
+                            <td>
+                              <select
+                                value={rasConfigs[cg.code_groep] ?? ''}
+                                onChange={e => saveRasLink(cg.code_groep, e.target.value ? Number(e.target.value) : null)}
+                                style={{ width: 'auto', minWidth: 170, fontSize: 12, padding: '3px 6px' }}
+                              >
+                                <option value="">— Ontkoppelen —</option>
+                                {rassen.map(r => <option key={r.id} value={r.id}>{r.naam} · {r.lh_naam}</option>)}
+                              </select>
                             </td>
                           </tr>
                         )
